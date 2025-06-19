@@ -20,6 +20,8 @@ import {
   trimStart
 } from 'obsidian-dev-utils/String';
 
+import { Md5 } from "ts-md5";
+
 type Formatter = (substitutions: Substitutions, format: string) => Promisable<unknown>;
 
 const MORE_THAN_TWO_DOTS_REG_EXP = /^\.{3,}$/;
@@ -41,6 +43,18 @@ export function getCustomTokenFormatters(customTokensStr: string): Map<string, F
   } catch (e) {
     throw new Error('Error initializing custom token formatters', { cause: e });
   }
+}
+
+async function generateMd5(app: App, filePath: string): Promise<string> {
+  const file = getFileOrNull(app, filePath);
+  if (!file) {
+    return '';
+  }
+  const content = await app.vault.readBinary(file);
+  const buf = Buffer.from(content)
+  const md5 = new Md5();
+  md5.appendByteArray(buf)
+  return md5.end() as string;
 }
 
 function formatDate(format: string): string {
@@ -137,6 +151,7 @@ export class Substitutions {
     this.registerFormatter('randomDigitOrLetter', () => generateRandomDigitOrLetter());
     this.registerFormatter('randomLetter', () => generateRandomLetter());
     this.registerFormatter('uuid', () => generateUuid());
+    this.registerFormatter('md5', (substitutions) => generateMd5(substitutions.app, substitutions.filePath))
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
     for (const [token, formatter] of customFormatters.entries()) {
