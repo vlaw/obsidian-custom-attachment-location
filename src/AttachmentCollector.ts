@@ -255,6 +255,7 @@ async function prepareAttachmentToMove(
   const app = plugin.app;
 
   const oldAttachmentFile = extractLinkFile(app, link, oldNotePath);
+  console.log(oldAttachmentFile)
   if (!oldAttachmentFile) {
     return null;
   }
@@ -273,7 +274,7 @@ async function prepareAttachmentToMove(
 
   if (plugin.settings.shouldRenameCollectedAttachments) {
     newAttachmentName = makeFileName(
-      await getPastedFileName(plugin, new Substitutions(plugin.app, newNotePath, oldAttachmentFile.name)),
+      await getPastedFileName(plugin, new Substitutions(plugin.app, newNotePath, oldAttachmentFile.name, oldAttachmentFile)),
       oldAttachmentFile.extension
     );
   } else if (plugin.settings.shouldRenameAttachmentFiles) {

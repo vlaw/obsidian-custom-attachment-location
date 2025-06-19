@@ -45,15 +45,24 @@ export function getCustomTokenFormatters(customTokensStr: string): Map<string, F
   }
 }
 
-async function generateMd5(app: App, filePath: string): Promise<string> {
-  const file = getFileOrNull(app, filePath);
+// collectAttachments()
+
+async function generateMd5(app: App, filePath: string, sub: Substitutions): Promise<string> {
+  console.log(filePath)
+  console.log(sub)
+  const file = getFileOrNull(app, origin + "." + sub.originalCopiedFileExtension);
   if (!file) {
-    return '';
+    // fall back to uuid
+    console.warn("fallback to uuid")
+    return generateUuid();
   }
-  const content = await app.vault.readBinary(file);
-  const buf = Buffer.from(content)
+  // const content = await app.vault.readBinary(file);
+  // const content = await app.vault.adapter.readBinary(filePath);
+  const data = await app.vault.readBinary(file)
+  const content = Buffer.from(data);
+
   const md5 = new Md5();
-  md5.appendByteArray(buf)
+  md5.appendByteArray(content);
   return md5.end() as string;
 }
 
@@ -114,7 +123,8 @@ export class Substitutions {
   public readonly folderName: string;
   public readonly folderPath: string;
   public readonly originalCopiedFileExtension: string;
-  public constructor(private readonly app: App, private readonly filePath: string, private readonly originalCopiedFileName = '') {
+
+  public constructor(private readonly app: App, private readonly filePath: string, private readonly originalCopiedFileName = '', readonly attachmentFile: TFile|null = null) {
     this.fileName = basename(filePath, extname(filePath));
     this.folderName = basename(dirname(filePath));
     this.folderPath = dirname(filePath);
@@ -151,7 +161,7 @@ export class Substitutions {
     this.registerFormatter('randomDigitOrLetter', () => generateRandomDigitOrLetter());
     this.registerFormatter('randomLetter', () => generateRandomLetter());
     this.registerFormatter('uuid', () => generateUuid());
-    this.registerFormatter('md5', (substitutions) => generateMd5(substitutions.app, substitutions.filePath))
+    this.registerFormatter('md5', (substitutions: Substitutions) => generateMd5(substitutions.app, substitutions.filePath, substitutions))
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
     for (const [token, formatter] of customFormatters.entries()) {
