@@ -20,6 +20,8 @@ import {
   trimStart
 } from 'obsidian-dev-utils/String';
 
+import { Md5 } from "ts-md5";
+
 type Formatter = (substitutions: Substitutions, format: string) => Promisable<unknown>;
 
 const MORE_THAN_TWO_DOTS_REG_EXP = /^\.{3,}$/;
@@ -43,13 +45,16 @@ export function getCustomTokenFormatters(customTokensStr: string): Map<string, F
   }
 }
 
-function generateMd5(app: App, filePath: string): string {
+async function generateMd5(app: App, filePath: string): Promise<string> {
   const file = getFileOrNull(app, filePath);
   if (!file) {
     return '';
   }
-
-  return "md5"
+  const content = await app.vault.readBinary(file);
+  const buf = Buffer.from(content)
+  const md5 = new Md5();
+  md5.appendByteArray(buf)
+  return md5.end() as string;
 }
 
 function formatDate(format: string): string {
