@@ -47,18 +47,13 @@ export function getCustomTokenFormatters(customTokensStr: string): Map<string, F
 
 // collectAttachments()
 
-async function generateMd5(app: App, filePath: string, sub: Substitutions): Promise<string> {
-  console.log(filePath)
-  console.log(sub)
-  const file = getFileOrNull(app, origin + "." + sub.originalCopiedFileExtension);
-  if (!file) {
+async function generateMd5(app: App, attachmentFile: TFile|null): Promise<string> {
+  if (!attachmentFile) {
     // fall back to uuid
     console.warn("fallback to uuid")
     return generateUuid();
   }
-  // const content = await app.vault.readBinary(file);
-  // const content = await app.vault.adapter.readBinary(filePath);
-  const data = await app.vault.readBinary(file)
+  const data = await app.vault.readBinary(attachmentFile)
   const content = Buffer.from(data);
 
   const md5 = new Md5();
@@ -161,7 +156,7 @@ export class Substitutions {
     this.registerFormatter('randomDigitOrLetter', () => generateRandomDigitOrLetter());
     this.registerFormatter('randomLetter', () => generateRandomLetter());
     this.registerFormatter('uuid', () => generateUuid());
-    this.registerFormatter('md5', (substitutions: Substitutions) => generateMd5(substitutions.app, substitutions.filePath, substitutions))
+    this.registerFormatter('md5', (substitutions: Substitutions) => generateMd5(substitutions.app, substitutions.attachmentFile))
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
     for (const [token, formatter] of customFormatters.entries()) {
