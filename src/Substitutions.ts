@@ -43,6 +43,15 @@ export function getCustomTokenFormatters(customTokensStr: string): Map<string, F
   }
 }
 
+function generateMd5(app: App, filePath: string): string {
+  const file = getFileOrNull(app, filePath);
+  if (!file) {
+    return '';
+  }
+
+  return "md5"
+}
+
 function formatDate(format: string): string {
   return moment().format(format);
 }
@@ -137,6 +146,7 @@ export class Substitutions {
     this.registerFormatter('randomDigitOrLetter', () => generateRandomDigitOrLetter());
     this.registerFormatter('randomLetter', () => generateRandomLetter());
     this.registerFormatter('uuid', () => generateUuid());
+    this.registerFormatter('md5', (substitutions) => generateMd5(substitutions.app, substitutions.filePath))
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
     for (const [token, formatter] of customFormatters.entries()) {
