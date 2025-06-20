@@ -255,7 +255,6 @@ async function prepareAttachmentToMove(
   const app = plugin.app;
 
   const oldAttachmentFile = extractLinkFile(app, link, oldNotePath);
-  console.log(oldAttachmentFile)
   if (!oldAttachmentFile) {
     return null;
   }
