@@ -279,8 +279,9 @@ async function prepareAttachmentToMove(
           app: plugin.app,
           attachmentFileSizeInBytes: oldAttachmentFile.stat.size,
           noteFilePath: newNotePath,
-          originalAttachmentFileName: oldAttachmentFile.name
-        })
+          originalAttachmentFileName: oldAttachmentFile.name,
+          attachmentFile: oldAttachmentFile
+        }),
       ),
       oldAttachmentFile.extension
     );

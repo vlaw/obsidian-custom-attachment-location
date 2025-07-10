@@ -19,6 +19,7 @@ import {
   trimEnd,
   trimStart
 } from 'obsidian-dev-utils/String';
+import { Md5 } from "ts-md5";
 // eslint-disable-next-line import-x/no-rename-default
 import slugify_ from 'slugify';
 
@@ -36,6 +37,8 @@ interface SubstitutionsOptions {
   attachmentFileSizeInBytes?: number;
   noteFilePath: string;
   originalAttachmentFileName?: string;
+  // hack
+  attachmentFile?: TFile;
 }
 
 export function getCustomTokenFormatters(customTokensStr: string): Map<string, Formatter> | null {
@@ -177,6 +180,8 @@ export class Substitutions {
   private readonly noteFolderName: string;
   private readonly originalAttachmentFileExtension: string;
   private readonly originalAttachmentFileName: string;
+  // hack
+  private readonly attachmentFile: TFile | undefined;
 
   public constructor(options: SubstitutionsOptions) {
     this.app = options.app;
@@ -192,6 +197,8 @@ export class Substitutions {
     this.originalAttachmentFileExtension = originalAttachmentFileExtension.slice(1);
 
     this.attachmentFileSizeInBytes = options.attachmentFileSizeInBytes ?? 0;
+
+    this.attachmentFile = options.attachmentFile;
   }
 
   public static isRegisteredToken(token: string): boolean {
@@ -225,6 +232,8 @@ export class Substitutions {
     this.registerFormatter('random', (_substitutions, format) => generateRandomValue(format));
 
     this.registerFormatter('attachmentFileSize', (substitutions, format) => formatFileSize(substitutions.attachmentFileSizeInBytes, format));
+
+    this.registerFormatter("md5", (substitutions) => generateMd5(substitutions.app, substitutions.attachmentFile))
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
     for (const [token, formatter] of customFormatters.entries()) {
@@ -360,4 +369,23 @@ function validateTokens(str: string): null | string {
     }
   }
   return null;
+}
+
+/**
+ * 生成附件文件的 MD5 哈希值，如果没有提供附件文件，则使用 UUID 作为替代。
+ * @param app Obsidian 的 App 对象
+ * @param attachmentFile 要生成 MD5 的附件文件，如果没有提供，则会使用 UUID 作为替代
+ * @returns 返回生成的 MD5 字符串，如果没有提供附件文件，则返回 UUID
+ */
+async function generateMd5(app: App, attachmentFile: TFile | undefined): Promise<string> {
+  if (!attachmentFile) {
+    console.warn("fall back to uuid");
+    return generateRandomValue('uuid');
+  }
+  const data: ArrayBuffer = await app.vault.readBinary(attachmentFile)
+
+  const md5 = new Md5();
+  // md5.appendByteArray(Buffer.from(data)); // Buffer 是 Node.js 特有的類型
+  md5.appendByteArray(new Uint8Array(data));
+  return md5.end() as string;
 }
