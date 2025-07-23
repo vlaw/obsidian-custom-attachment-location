@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 8.2.2-CP2
+
+- fix: lint:fix
+- chore(cspell): add custom words
+- style: npm run format
+- chore(package.json): add dprint(testing)
+- feat: 支持paste重命名
+- chore(help.sh): 移出多Vault支持
+- chore(help.sh): update vault home
+- fixup! chore: update version for customized patch
+- feat: md5 token
+- chore: add help script
+- chore: install ts-md5
+- chore: update version for customized patch
+
 ## 8.2.2
 
 - Update libs (#170)

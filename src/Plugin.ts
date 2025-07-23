@@ -366,7 +366,8 @@ export class Plugin extends PluginBase<PluginTypes> {
           app: this.app,
           attachmentFileSizeInBytes: attachmentFileData.byteLength,
           noteFilePath: activeNoteFile.path,
-          originalAttachmentFileName: makeFileName(attachmentFileName, attachmentFileExtension)
+          originalAttachmentFileName: makeFileName(attachmentFileName, attachmentFileExtension),
+          attachmentFileData: attachmentFileData
         })
       );
     }
@@ -377,7 +378,8 @@ export class Plugin extends PluginBase<PluginTypes> {
         app: this.app,
         attachmentFileSizeInBytes: attachmentFileData.byteLength,
         noteFilePath: activeNoteFile.path,
-        originalAttachmentFileName: attachmentFile.name
+        originalAttachmentFileName: attachmentFile.name,
+        attachmentFileData: attachmentFileData
       }).fillTemplate(this.settings.markdownUrlFormat);
       this.pathMarkdownUrlMap.set(attachmentFile.path, markdownUrl);
     } else {

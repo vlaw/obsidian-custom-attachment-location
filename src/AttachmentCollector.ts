@@ -271,17 +271,20 @@ async function prepareAttachmentToMove(
 
   let newAttachmentName: string;
 
+  // Hack
+  const attachmentFileData: ArrayBuffer = await app.vault.readBinary(oldAttachmentFile);
+
   if (plugin.settings.shouldRenameCollectedAttachments) {
     newAttachmentName = makeFileName(
       await getPastedFileName(
         plugin,
         new Substitutions({
           app: plugin.app,
+          attachmentFileData,
           attachmentFileSizeInBytes: oldAttachmentFile.stat.size,
           noteFilePath: newNotePath,
-          originalAttachmentFileName: oldAttachmentFile.name,
-          attachmentFile: oldAttachmentFile
-        }),
+          originalAttachmentFileName: oldAttachmentFile.name
+        })
       ),
       oldAttachmentFile.extension
     );

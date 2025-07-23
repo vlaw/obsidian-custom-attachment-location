@@ -19,9 +19,9 @@ import {
   trimEnd,
   trimStart
 } from 'obsidian-dev-utils/String';
-import { Md5 } from "ts-md5";
 // eslint-disable-next-line import-x/no-rename-default
 import slugify_ from 'slugify';
+import { Md5 } from 'ts-md5';
 
 const slugify = ('default' in slugify_ ? slugify_.default : slugify_) as unknown as typeof slugify_.default;
 
@@ -37,8 +37,8 @@ interface SubstitutionsOptions {
   attachmentFileSizeInBytes?: number;
   noteFilePath: string;
   originalAttachmentFileName?: string;
-  // hack
-  attachmentFile?: TFile;
+  // Hack
+  attachmentFileData?: ArrayBuffer;
 }
 
 export function getCustomTokenFormatters(customTokensStr: string): Map<string, Formatter> | null {
@@ -109,6 +109,23 @@ function formatFileSize(sizeInBytes: number, format: string): string {
   }
 }
 
+/**
+ * 生成附件文件的 MD5 哈希值，如果没有提供附件文件，则使用 UUID 作为替代。
+ * @param app Obsidian 的 App 对象
+ * @param attachmentFile 要生成 MD5 的附件文件，如果没有提供，则会使用 UUID 作为替代
+ * @returns 返回生成的 MD5 字符串，如果没有提供附件文件，则返回 UUID
+ */
+function generateMd5(attachmentFileData: ArrayBuffer | undefined): string {
+  if (!attachmentFileData) {
+    console.warn('fall back to uuid');
+    return generateRandomValue('uuid');
+  }
+
+  const md5 = new Md5();
+  md5.appendByteArray(new Uint8Array(attachmentFileData));
+  return md5.end() as string;
+}
+
 function generateRandomValue(format: string): string {
   if (format === 'uuid') {
     return crypto.randomUUID();
@@ -174,14 +191,14 @@ export class Substitutions {
 
   private readonly app: App;
 
+  // Hack
+  private readonly attachmentFileData: ArrayBuffer | undefined;
   private attachmentFileSizeInBytes: number;
   private readonly noteFileName: string;
   private readonly noteFilePath: string;
   private readonly noteFolderName: string;
   private readonly originalAttachmentFileExtension: string;
   private readonly originalAttachmentFileName: string;
-  // hack
-  private readonly attachmentFile: TFile | undefined;
 
   public constructor(options: SubstitutionsOptions) {
     this.app = options.app;
@@ -198,7 +215,7 @@ export class Substitutions {
 
     this.attachmentFileSizeInBytes = options.attachmentFileSizeInBytes ?? 0;
 
-    this.attachmentFile = options.attachmentFile;
+    this.attachmentFileData = options.attachmentFileData;
   }
 
   public static isRegisteredToken(token: string): boolean {
@@ -233,7 +250,7 @@ export class Substitutions {
 
     this.registerFormatter('attachmentFileSize', (substitutions, format) => formatFileSize(substitutions.attachmentFileSizeInBytes, format));
 
-    this.registerFormatter("md5", (substitutions) => generateMd5(substitutions.app, substitutions.attachmentFile))
+    this.registerFormatter('md5', (substitutions) => generateMd5(substitutions.attachmentFileData));
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
     for (const [token, formatter] of customFormatters.entries()) {
@@ -369,23 +386,4 @@ function validateTokens(str: string): null | string {
     }
   }
   return null;
-}
-
-/**
- * 生成附件文件的 MD5 哈希值，如果没有提供附件文件，则使用 UUID 作为替代。
- * @param app Obsidian 的 App 对象
- * @param attachmentFile 要生成 MD5 的附件文件，如果没有提供，则会使用 UUID 作为替代
- * @returns 返回生成的 MD5 字符串，如果没有提供附件文件，则返回 UUID
- */
-async function generateMd5(app: App, attachmentFile: TFile | undefined): Promise<string> {
-  if (!attachmentFile) {
-    console.warn("fall back to uuid");
-    return generateRandomValue('uuid');
-  }
-  const data: ArrayBuffer = await app.vault.readBinary(attachmentFile)
-
-  const md5 = new Md5();
-  // md5.appendByteArray(Buffer.from(data)); // Buffer 是 Node.js 特有的類型
-  md5.appendByteArray(new Uint8Array(data));
-  return md5.end() as string;
 }
