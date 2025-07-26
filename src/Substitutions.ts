@@ -27,6 +27,11 @@ const slugify = ('default' in slugify_ ? slugify_.default : slugify_) as unknown
 
 type Formatter = (substitutions: Substitutions, format: string) => Promisable<unknown>;
 
+interface FormatWithParameter {
+  base: string;
+  parameter: number | undefined;
+}
+
 const MORE_THAN_TWO_DOTS_REG_EXP = /^\.{3,}$/;
 const TRAILING_DOTS_AND_SPACES_REG_EXP = /[. ]+$/;
 export const INVALID_FILENAME_PATH_CHARS_REG_EXP = /[\\/:*?"<>|]/;
@@ -34,11 +39,13 @@ export const SUBSTITUTION_TOKEN_REG_EXP = /\${(?<Token>.+?)(?::(?<Format>.+?))?}
 
 interface SubstitutionsOptions {
   app: App;
-  attachmentFileSizeInBytes?: number;
-  noteFilePath: string;
-  originalAttachmentFileName?: string;
   // Hack
   attachmentFileData?: ArrayBuffer;
+  attachmentFileSizeInBytes?: number;
+  generatedAttachmentFileName?: string;
+  generatedAttachmentFilePath?: string;
+  noteFilePath: string;
+  originalAttachmentFileName?: string;
 }
 
 export function getCustomTokenFormatters(customTokensStr: string): Map<string, Formatter> | null {
@@ -70,11 +77,17 @@ function formatFileDate(app: App, noteFilePath: string, format: string, getTimes
 }
 
 function formatFileName(fileName: string, format: string): string {
-  switch (format) {
+  const { base, parameter } = parseFormatWithParameter(format);
+
+  switch (base) {
     case '':
       return fileName;
+    case 'left':
+      return fileName.slice(0, parameter ?? 1);
     case 'lower':
       return fileName.toLowerCase();
+    case 'right':
+      return fileName.slice(-(parameter ?? 1));
     case 'slug':
       return slugifyEx(fileName);
     case 'upper':
@@ -88,22 +101,16 @@ function formatFileSize(sizeInBytes: number, format: string): string {
   const BYTES_IN_KB = 1024;
   const BYTES_IN_MB = BYTES_IN_KB * BYTES_IN_KB;
 
-  const match = /^(?<BaseFormat>|B|KB|MB)(?<FractionDigits>\d*)$/.exec(format);
-  if (!match) {
-    throw new Error(`Invalid random value format: ${format}`);
-  }
+  const { base, parameter } = parseFormatWithParameter(format);
 
-  const baseFormat = match.groups?.['BaseFormat'] as '' | 'B' | 'KB' | 'MB';
-  const fractionDigits = parseInt((match.groups?.['FractionDigits'] ?? '') || '0', 10);
-
-  switch (baseFormat) {
+  switch (base) {
     case '':
     case 'B':
-      return sizeInBytes.toFixed(fractionDigits);
+      return sizeInBytes.toFixed(parameter ?? 0);
     case 'KB':
-      return (sizeInBytes / BYTES_IN_KB).toFixed(fractionDigits);
+      return (sizeInBytes / BYTES_IN_KB).toFixed(parameter ?? 0);
     case 'MB':
-      return (sizeInBytes / BYTES_IN_MB).toFixed(fractionDigits);
+      return (sizeInBytes / BYTES_IN_MB).toFixed(parameter ?? 0);
     default:
       throw new Error(`Invalid file size format: ${format}`);
   }
@@ -131,17 +138,11 @@ function generateRandomValue(format: string): string {
     return crypto.randomUUID();
   }
 
-  const match = /^(?<BaseFormat>D|L|DL)(?<Count>\d*)$/.exec(format);
-  if (!match) {
-    throw new Error(`Invalid random value format: ${format}`);
-  }
-
-  const baseFormat = match.groups?.['BaseFormat'] as 'D' | 'DL' | 'L';
-  const count = parseInt((match.groups?.['Count'] ?? '') || '1', 10);
+  const { base, parameter } = parseFormatWithParameter(format);
 
   let symbols: string;
 
-  switch (baseFormat) {
+  switch (base) {
     case 'D':
       symbols = '0123456789';
       break;
@@ -157,7 +158,7 @@ function generateRandomValue(format: string): string {
 
   let ans = '';
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < (parameter ?? 1); i++) {
     ans += generateRandomSymbol(symbols);
   }
 
@@ -194,6 +195,8 @@ export class Substitutions {
   // Hack
   private readonly attachmentFileData: ArrayBuffer | undefined;
   private attachmentFileSizeInBytes: number;
+  private readonly generatedAttachmentFileName: string;
+  private readonly generatedAttachmentFilePath: string;
   private readonly noteFileName: string;
   private readonly noteFilePath: string;
   private readonly noteFolderName: string;
@@ -214,6 +217,8 @@ export class Substitutions {
     this.originalAttachmentFileExtension = originalAttachmentFileExtension.slice(1);
 
     this.attachmentFileSizeInBytes = options.attachmentFileSizeInBytes ?? 0;
+    this.generatedAttachmentFileName = options.generatedAttachmentFileName ?? '';
+    this.generatedAttachmentFilePath = options.generatedAttachmentFilePath ?? '';
 
     this.attachmentFileData = options.attachmentFileData;
   }
@@ -250,6 +255,9 @@ export class Substitutions {
 
     this.registerFormatter('attachmentFileSize', (substitutions, format) => formatFileSize(substitutions.attachmentFileSizeInBytes, format));
 
+    this.registerFormatter('generatedAttachmentFileName', (substitutions, format) => formatFileName(substitutions.generatedAttachmentFileName, format));
+    this.registerFormatter('generatedAttachmentFilePath', (substitutions) => substitutions.generatedAttachmentFilePath);
+
     this.registerFormatter('md5', (substitutions) => generateMd5(substitutions.attachmentFileData));
 
     const customFormatters = getCustomTokenFormatters(customTokensStr) ?? new Map<string, Formatter>();
@@ -284,7 +292,7 @@ export class Substitutions {
       defaultValue: this.originalAttachmentFileName,
       // eslint-disable-next-line no-template-curly-in-string
       title: 'Provide a value for ${prompt} template',
-      valueValidator: (value) => validateFilename(value, false)
+      valueValidator: (value) => validateFileName(value, false)
     });
     if (promptResult === null) {
       throw new Error('Prompt cancelled');
@@ -293,38 +301,38 @@ export class Substitutions {
   }
 }
 
-export function validateFilename(filename: string, areTokensAllowed = true): string {
+export function validateFileName(fileName: string, areTokensAllowed = true): string {
   if (areTokensAllowed) {
-    filename = removeTokenFormatting(filename);
-    const unknownToken = validateTokens(filename);
+    fileName = removeTokenFormatting(fileName);
+    const unknownToken = validateTokens(fileName);
     if (unknownToken) {
       return `Unknown token: ${unknownToken}`;
     }
   } else {
-    const match = filename.match(SUBSTITUTION_TOKEN_REG_EXP);
+    const match = fileName.match(SUBSTITUTION_TOKEN_REG_EXP);
     if (match) {
       return 'Tokens are not allowed in file name';
     }
   }
 
-  if (filename === '.' || filename === '..') {
+  if (fileName === '.' || fileName === '..') {
     return '';
   }
 
-  if (!filename) {
+  if (!fileName) {
     return 'File name is empty';
   }
 
-  if (INVALID_FILENAME_PATH_CHARS_REG_EXP.test(filename)) {
-    return `File name "${filename}" contains invalid symbols`;
+  if (INVALID_FILENAME_PATH_CHARS_REG_EXP.test(fileName)) {
+    return `File name "${fileName}" contains invalid symbols`;
   }
 
-  if (MORE_THAN_TWO_DOTS_REG_EXP.test(filename)) {
-    return `File name "${filename}" contains more than two dots`;
+  if (MORE_THAN_TWO_DOTS_REG_EXP.test(fileName)) {
+    return `File name "${fileName}" contains more than two dots`;
   }
 
-  if (TRAILING_DOTS_AND_SPACES_REG_EXP.test(filename)) {
-    return `File name "${filename}" contains trailing dots or spaces`;
+  if (TRAILING_DOTS_AND_SPACES_REG_EXP.test(fileName)) {
+    return `File name "${fileName}" contains trailing dots or spaces`;
   }
 
   return '';
@@ -353,7 +361,7 @@ export function validatePath(path: string, areTokensAllowed = true): string {
 
   const parts = path.split('/');
   for (const part of parts) {
-    const partValidationError = validateFilename(part);
+    const partValidationError = validateFileName(part);
 
     if (partValidationError) {
       return partValidationError;
@@ -365,6 +373,22 @@ export function validatePath(path: string, areTokensAllowed = true): string {
 
 function generateRandomSymbol(symbols: string): string {
   return symbols[Math.floor(Math.random() * symbols.length)] ?? '';
+}
+
+function parseFormatWithParameter(format: string): FormatWithParameter {
+  const match = /^(?<Base>\w*?)(?<Parameter>\d*)$/.exec(format);
+  if (!match) {
+    throw new Error(`Invalid format: ${format}`);
+  }
+
+  const base = match.groups?.['Base'] ?? '';
+  const parameterStr = match.groups?.['Parameter'];
+  const parameter = parameterStr ? parseInt(parameterStr, 10) : undefined;
+
+  return {
+    base,
+    parameter
+  };
 }
 
 function removeTokenFormatting(str: string): string {

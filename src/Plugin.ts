@@ -64,6 +64,7 @@ import { Substitutions } from './Substitutions.ts';
 
 type GenerateMarkdownLinkFn = FileManager['generateMarkdownLink'];
 type GetAvailablePathFn = Vault['getAvailablePath'];
+type GetAvailablePathForAttachmentsFn = Vault['getAvailablePathForAttachments'];
 type GetConfigFn = Vault['getConfig'];
 type GetPathForFileFn = typeof webUtils['getPathForFile'];
 type SaveAttachmentFn = App['saveAttachment'];
@@ -78,6 +79,7 @@ interface FileEx {
 
 export class Plugin extends PluginBase<PluginTypes> {
   private currentAttachmentFolderPath: null | string = null;
+  private getAvailablePathForAttachmentsOriginal: GetAvailablePathForAttachmentsFn | null = null;
   private lastOpenFilePath: null | string = null;
   private readonly pathMarkdownUrlMap = new Map<string, string>();
 
@@ -93,7 +95,8 @@ export class Plugin extends PluginBase<PluginTypes> {
     await super.onLayoutReady();
     registerPatch(this, this.app.vault, {
       getAvailablePath: (): GetAvailablePathFn => this.getAvailablePath.bind(this),
-      getAvailablePathForAttachments: (): ExtendedWrapper & GetAvailablePathForAttachmentsExtendedFn => {
+      getAvailablePathForAttachments: (next: GetAvailablePathForAttachmentsFn): ExtendedWrapper & GetAvailablePathForAttachmentsExtendedFn => {
+        this.getAvailablePathForAttachmentsOriginal = next.bind(this.app.vault);
         const extendedWrapper: ExtendedWrapper = {
           isExtended: true as const
         };
@@ -155,7 +158,7 @@ export class Plugin extends PluginBase<PluginTypes> {
         shouldHandleRenames: true,
         shouldRenameAttachmentFiles: this.settings.shouldRenameAttachmentFiles,
         shouldRenameAttachmentFolder: this.settings.shouldRenameAttachmentFolder,
-        shouldUpdateFilenameAliases: true
+        shouldUpdateFileNameAliases: true
       };
       return settings;
     });
@@ -225,12 +228,15 @@ export class Plugin extends PluginBase<PluginTypes> {
     return defaultLink.replace(/\]\(.+?\)/, `](${encodeUrl(markdownUrl)})`);
   }
 
-  private getAvailablePath(filename: string, extension: string): string {
+  private getAvailablePath(attachmentFileName: string, attachmentExtension: string): string {
     let suffixNum = 0;
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
-      const path = makeFileName(suffixNum === 0 ? filename : `${filename}${this.settings.duplicateNameSeparator}${suffixNum.toString()}`, extension);
+      const path = makeFileName(
+        suffixNum === 0 ? attachmentFileName : `${attachmentFileName}${this.settings.duplicateNameSeparator}${suffixNum.toString()}`,
+        attachmentExtension
+      );
 
       if (!getAbstractFileOrNull(this.app, path, true)) {
         return path;
@@ -241,21 +247,30 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   private async getAvailablePathForAttachments(
-    filename: string,
-    extension: string,
-    file: null | TFile,
-    skipFolderCreation: boolean | undefined,
+    attachmentFileName: string,
+    attachmentExtension: string,
+    noteFile: null | TFile,
+    skipMissingAttachmentFolderCreation: boolean | undefined,
     attachmentFileSizeInBytes?: number
   ): Promise<string> {
-    let attachmentPath: string;
-    if (!file || !isNoteEx(this, file)) {
-      attachmentPath = await getAvailablePathForAttachments(this.app, filename, extension, file, true);
-    } else {
-      const attachmentFolderFullPath = await getAttachmentFolderFullPathForPath(this, file.path, makeFileName(filename, extension), attachmentFileSizeInBytes);
-      attachmentPath = this.app.vault.getAvailablePath(join(attachmentFolderFullPath, filename), extension);
+    if (noteFile && this.settings.isPathIgnored(noteFile.path) && this.getAvailablePathForAttachmentsOriginal) {
+      return this.getAvailablePathForAttachmentsOriginal(attachmentFileName, attachmentExtension, noteFile);
     }
 
-    if (!skipFolderCreation) {
+    let attachmentPath: string;
+    if (!noteFile || !isNoteEx(this, noteFile)) {
+      attachmentPath = await getAvailablePathForAttachments(this.app, attachmentFileName, attachmentExtension, noteFile, true);
+    } else {
+      const attachmentFolderFullPath = await getAttachmentFolderFullPathForPath(
+        this,
+        noteFile.path,
+        makeFileName(attachmentFileName, attachmentExtension),
+        attachmentFileSizeInBytes
+      );
+      attachmentPath = this.app.vault.getAvailablePath(join(attachmentFolderFullPath, attachmentFileName), attachmentExtension);
+    }
+
+    if (!skipMissingAttachmentFolderCreation) {
       const folderPath = parentFolderPath(attachmentPath);
       if (!await this.app.vault.exists(folderPath)) {
         await createFolderSafe(this.app, folderPath);
@@ -297,7 +312,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   private async handleFileOpen(file: null | TFile): Promise<void> {
-    if (file === null) {
+    if (file === null || this.settings.isPathIgnored(file.path)) {
       this.currentAttachmentFolderPath = null;
       this.lastOpenFilePath = null;
       return;
@@ -364,10 +379,10 @@ export class Plugin extends PluginBase<PluginTypes> {
         this,
         new Substitutions({
           app: this.app,
+          attachmentFileData,
           attachmentFileSizeInBytes: attachmentFileData.byteLength,
           noteFilePath: activeNoteFile.path,
-          originalAttachmentFileName: makeFileName(attachmentFileName, attachmentFileExtension),
-          attachmentFileData: attachmentFileData
+          originalAttachmentFileName: makeFileName(attachmentFileName, attachmentFileExtension)
         })
       );
     }
@@ -376,10 +391,12 @@ export class Plugin extends PluginBase<PluginTypes> {
     if (this.settings.markdownUrlFormat) {
       const markdownUrl = await new Substitutions({
         app: this.app,
+        attachmentFileData,
         attachmentFileSizeInBytes: attachmentFileData.byteLength,
+        generatedAttachmentFileName: attachmentFile.name,
+        generatedAttachmentFilePath: attachmentFile.path,
         noteFilePath: activeNoteFile.path,
-        originalAttachmentFileName: attachmentFile.name,
-        attachmentFileData: attachmentFileData
+        originalAttachmentFileName: makeFileName(attachmentFileName, attachmentFileExtension)
       }).fillTemplate(this.settings.markdownUrlFormat);
       this.pathMarkdownUrlMap.set(attachmentFile.path, markdownUrl);
     } else {

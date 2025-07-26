@@ -14,21 +14,29 @@ export enum AttachmentRenameMode {
   All = 'All'
 }
 
+export enum CollectAttachmentUsedByMultipleNotesMode {
+  Cancel = 'Cancel',
+  Copy = 'Copy',
+  Move = 'Move',
+  Prompt = 'Prompt',
+  Skip = 'Skip'
+}
+
 export class PluginSettings {
   // eslint-disable-next-line no-template-curly-in-string
   public attachmentFolderPath = './assets/${noteFileName}';
   public attachmentRenameMode: AttachmentRenameMode = AttachmentRenameMode.OnlyPastedImages;
+  public collectAttachmentUsedByMultipleNotesMode: CollectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Skip;
   public duplicateNameSeparator = ' ';
   public emptyAttachmentFolderBehavior: EmptyAttachmentFolderBehavior = EmptyAttachmentFolderBehavior.DeleteWithEmptyParents;
   // eslint-disable-next-line no-template-curly-in-string
-  public generatedAttachmentFilename = 'file-${date:YYYYMMDDHHmmssSSS}';
+  public generatedAttachmentFileName = 'file-${date:YYYYMMDDHHmmssSSS}';
   // eslint-disable-next-line no-magic-numbers
   public jpegQuality = 0.8;
   public markdownUrlFormat = '';
 
   public shouldConvertPastedImagesToJpeg = false;
   public shouldDeleteOrphanAttachments = false;
-  public shouldDuplicateCollectedAttachments = false;
   public shouldRenameAttachmentFiles = false;
   public shouldRenameAttachmentFolder = true;
   public shouldRenameAttachmentsToLowerCase = false;

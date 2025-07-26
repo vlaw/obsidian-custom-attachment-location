@@ -7,21 +7,25 @@ import { replaceAll } from 'obsidian-dev-utils/String';
 
 import type { PluginTypes } from './PluginTypes.ts';
 
-import { PluginSettings } from './PluginSettings.ts';
+import {
+  CollectAttachmentUsedByMultipleNotesMode,
+  PluginSettings
+} from './PluginSettings.ts';
 import {
   getCustomTokenFormatters,
   INVALID_FILENAME_PATH_CHARS_REG_EXP,
-  validateFilename,
+  validateFileName,
   validatePath
 } from './Substitutions.ts';
 
-class LegacySettings extends PluginSettings {
+class LegacySettings {
   public autoRenameFiles = false;
   public autoRenameFolder = true;
   public convertImagesOnDragAndDrop = false;
   public convertImagesToJpeg = false;
   public dateTimeFormat = '';
   public deleteOrphanAttachments = false;
+  public generatedAttachmentFilename = '';
   public keepEmptyAttachmentFolders = false;
   // eslint-disable-next-line no-template-curly-in-string
   public pastedFileName = 'file-${date:YYYYMMDDHHmmssSSS}';
@@ -31,6 +35,7 @@ class LegacySettings extends PluginSettings {
   public renameOnlyImages = false;
   public renamePastedFilesWithKnownNames = false;
   public replaceWhitespace = false;
+  public shouldDuplicateCollectedAttachments = false;
   public shouldKeepEmptyAttachmentFolders = false;
   public toLowerCase = false;
   public whitespaceReplacement = '';
@@ -41,69 +46,80 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
     return new PluginSettings();
   }
 
-  protected override async onLoadRecord(record: Record<string, unknown>): Promise<void> {
-    await super.onLoadRecord(record);
-    const legacySettings = record as Partial<LegacySettings>;
-    const dateTimeFormat = legacySettings.dateTimeFormat ?? 'YYYYMMDDHHmmssSSS';
-    legacySettings.attachmentFolderPath = addDateTimeFormat(legacySettings.attachmentFolderPath ?? '', dateTimeFormat);
+  protected override registerLegacySettingsConverters(): void {
+    // eslint-disable-next-line complexity
+    this.registerLegacySettingsConverter(LegacySettings, (legacySettings) => {
+      const dateTimeFormat = legacySettings.dateTimeFormat ?? 'YYYYMMDDHHmmssSSS';
+      legacySettings.attachmentFolderPath = addDateTimeFormat(legacySettings.attachmentFolderPath ?? '', dateTimeFormat);
 
-    legacySettings.generatedAttachmentFilename = addDateTimeFormat(
-      // eslint-disable-next-line no-template-curly-in-string
-      legacySettings.generatedAttachmentFilename ?? legacySettings.pastedFileName ?? legacySettings.pastedImageFileName ?? 'file-${date}',
-      dateTimeFormat
-    );
-    if (legacySettings.replaceWhitespace !== undefined) {
-      legacySettings.whitespaceReplacement = legacySettings.replaceWhitespace ? '-' : '';
-    }
+      legacySettings.generatedAttachmentFileName = addDateTimeFormat(
+        legacySettings.generatedAttachmentFileName
+          ?? legacySettings.generatedAttachmentFilename
+          ?? legacySettings.pastedFileName
+          ?? legacySettings.pastedImageFileName
+          // eslint-disable-next-line no-template-curly-in-string
+          ?? 'file-${date}',
+        dateTimeFormat
+      );
+      if (legacySettings.replaceWhitespace !== undefined) {
+        legacySettings.whitespaceReplacement = legacySettings.replaceWhitespace ? '-' : '';
+      }
 
-    if (legacySettings.autoRenameFiles !== undefined) {
-      legacySettings.shouldRenameAttachmentFiles = legacySettings.autoRenameFiles;
-    }
+      if (legacySettings.autoRenameFiles !== undefined) {
+        legacySettings.shouldRenameAttachmentFiles = legacySettings.autoRenameFiles;
+      }
 
-    if (legacySettings.autoRenameFolder !== undefined) {
-      legacySettings.shouldRenameAttachmentFolder = legacySettings.autoRenameFolder;
-    }
+      if (legacySettings.autoRenameFolder !== undefined) {
+        legacySettings.shouldRenameAttachmentFolder = legacySettings.autoRenameFolder;
+      }
 
-    if (legacySettings.deleteOrphanAttachments !== undefined) {
-      legacySettings.shouldDeleteOrphanAttachments = legacySettings.deleteOrphanAttachments;
-    }
+      if (legacySettings.deleteOrphanAttachments !== undefined) {
+        legacySettings.shouldDeleteOrphanAttachments = legacySettings.deleteOrphanAttachments;
+      }
 
-    if (legacySettings.keepEmptyAttachmentFolders !== undefined) {
-      legacySettings.shouldKeepEmptyAttachmentFolders = legacySettings.keepEmptyAttachmentFolders;
-    }
+      if (legacySettings.keepEmptyAttachmentFolders !== undefined) {
+        legacySettings.shouldKeepEmptyAttachmentFolders = legacySettings.keepEmptyAttachmentFolders;
+      }
 
-    if (legacySettings.renameCollectedFiles !== undefined) {
-      legacySettings.shouldRenameCollectedAttachments = legacySettings.renameCollectedFiles;
-    }
+      if (legacySettings.renameCollectedFiles !== undefined) {
+        legacySettings.shouldRenameCollectedAttachments = legacySettings.renameCollectedFiles;
+      }
 
-    if (legacySettings.toLowerCase !== undefined) {
-      legacySettings.shouldRenameAttachmentsToLowerCase = legacySettings.toLowerCase;
-    }
+      if (legacySettings.toLowerCase !== undefined) {
+        legacySettings.shouldRenameAttachmentsToLowerCase = legacySettings.toLowerCase;
+      }
 
-    if (legacySettings.convertImagesToJpeg !== undefined) {
-      legacySettings.shouldConvertPastedImagesToJpeg = legacySettings.convertImagesToJpeg;
-    }
+      if (legacySettings.convertImagesToJpeg !== undefined) {
+        legacySettings.shouldConvertPastedImagesToJpeg = legacySettings.convertImagesToJpeg;
+      }
 
-    if (legacySettings.whitespaceReplacement) {
-      legacySettings.specialCharacters = `${legacySettings.specialCharacters ?? ''} `;
-      legacySettings.specialCharactersReplacement = legacySettings.whitespaceReplacement;
-    }
+      if (legacySettings.whitespaceReplacement) {
+        legacySettings.specialCharacters = `${legacySettings.specialCharacters ?? ''} `;
+        legacySettings.specialCharactersReplacement = legacySettings.whitespaceReplacement;
+      }
 
-    if (legacySettings.shouldKeepEmptyAttachmentFolders !== undefined) {
-      legacySettings.emptyAttachmentFolderBehavior = legacySettings.shouldKeepEmptyAttachmentFolders
-        ? EmptyAttachmentFolderBehavior.Keep
-        : EmptyAttachmentFolderBehavior.DeleteWithEmptyParents;
-    }
+      if (legacySettings.shouldKeepEmptyAttachmentFolders !== undefined) {
+        legacySettings.emptyAttachmentFolderBehavior = legacySettings.shouldKeepEmptyAttachmentFolders
+          ? EmptyAttachmentFolderBehavior.Keep
+          : EmptyAttachmentFolderBehavior.DeleteWithEmptyParents;
+      }
 
-    legacySettings.attachmentFolderPath = this.replaceLegacyTokens(legacySettings.attachmentFolderPath);
-    legacySettings.generatedAttachmentFilename = this.replaceLegacyTokens(legacySettings.generatedAttachmentFilename);
-    legacySettings.markdownUrlFormat = this.replaceLegacyTokens(legacySettings.markdownUrlFormat);
-    legacySettings.customTokensStr = this.replaceLegacyTokens(legacySettings.customTokensStr ?? '');
+      legacySettings.attachmentFolderPath = this.replaceLegacyTokens(legacySettings.attachmentFolderPath);
+      legacySettings.generatedAttachmentFileName = this.replaceLegacyTokens(legacySettings.generatedAttachmentFileName);
+      legacySettings.markdownUrlFormat = this.replaceLegacyTokens(legacySettings.markdownUrlFormat);
+      legacySettings.customTokensStr = this.replaceLegacyTokens(legacySettings.customTokensStr ?? '');
+
+      if (legacySettings.collectAttachmentUsedByMultipleNotesMode === undefined && legacySettings.shouldDuplicateCollectedAttachments !== undefined) {
+        legacySettings.collectAttachmentUsedByMultipleNotesMode = legacySettings.shouldDuplicateCollectedAttachments
+          ? CollectAttachmentUsedByMultipleNotesMode.Copy
+          : CollectAttachmentUsedByMultipleNotesMode.Skip;
+      }
+    });
   }
 
   protected override registerValidators(): void {
     this.registerValidator('attachmentFolderPath', (value) => validatePath(value));
-    this.registerValidator('generatedAttachmentFilename', (value) => validatePath(value));
+    this.registerValidator('generatedAttachmentFileName', (value) => validatePath(value));
     this.registerValidator('specialCharacters', (value): MaybeReturn<string> => {
       if (value.includes('/')) {
         return 'Special characters must not contain /';
@@ -112,12 +128,12 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
 
     this.registerValidator('specialCharactersReplacement', (value): MaybeReturn<string> => {
       if (INVALID_FILENAME_PATH_CHARS_REG_EXP.exec(value)) {
-        return 'Special character replacement must not contain invalid filename path characters.';
+        return 'Special character replacement must not contain invalid file name path characters.';
       }
     });
 
     this.registerValidator('duplicateNameSeparator', (value): MaybeReturn<string> => {
-      return validateFilename(`filename${value}1`, false);
+      return validateFileName(`foo${value}1`, false);
     });
 
     this.registerValidator('includePaths', (value): MaybeReturn<string> => {

@@ -10,7 +10,10 @@ import { SettingEx } from 'obsidian-dev-utils/obsidian/SettingEx';
 
 import type { PluginTypes } from './PluginTypes.ts';
 
-import { AttachmentRenameMode } from './PluginSettings.ts';
+import {
+  AttachmentRenameMode,
+  CollectAttachmentUsedByMultipleNotesMode
+} from './PluginSettings.ts';
 import { TOKENIZED_STRING_LANGUAGE } from './PrismComponent.ts';
 
 const VISIBLE_WHITESPACE_CHARACTER = '␣';
@@ -50,7 +53,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
 
     new SettingEx(this.containerEl)
-      .setName('Generated attachment filename')
+      .setName('Generated attachment file name')
       .setDesc(createFragment((f) => {
         f.appendText('See available ');
         f.createEl('a', { href: 'https://github.com/RainCat1998/obsidian-custom-attachment-location?tab=readme-ov-file#tokens', text: 'tokens' });
@@ -58,7 +61,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .addCodeHighlighter((codeHighlighter) => {
         codeHighlighter.setLanguage(TOKENIZED_STRING_LANGUAGE);
         codeHighlighter.inputEl.addClass('tokenized-string-setting-control');
-        this.bind(codeHighlighter, 'generatedAttachmentFilename');
+        this.bind(codeHighlighter, 'generatedAttachmentFileName');
       });
 
     new SettingEx(this.containerEl)
@@ -80,10 +83,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     new SettingEx(this.containerEl)
       .setName('Attachment rename mode')
       .setDesc(createFragment((f) => {
-        f.appendText('When attaching files, ');
+        f.appendText('When attaching files:');
         f.createEl('br');
         appendCodeBlock(f, 'None');
-        f.appendText(' - their names are preserved, ');
+        f.appendText(' - their names are preserved.');
         f.createEl('br');
         appendCodeBlock(f, 'Only pasted images');
         f.appendText(' - only pasted images are renamed.');
@@ -104,7 +107,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .setDesc(createFragment((f) => {
         f.appendText('When renaming md files, automatically rename attachment folder if folder name contains ');
         // eslint-disable-next-line no-template-curly-in-string
-        appendCodeBlock(f, '${filename}');
+        appendCodeBlock(f, '${noteFileName}');
         f.appendText('.');
       }))
       .addToggle((toggle) => {
@@ -116,7 +119,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .setDesc(createFragment((f) => {
         f.appendText('When renaming md files, automatically rename attachment files if file name contains ');
         // eslint-disable-next-line no-template-curly-in-string
-        appendCodeBlock(f, '${filename}');
+        appendCodeBlock(f, '${noteFileName}');
         f.appendText('.');
       }))
       .addToggle((toggle) => {
@@ -193,16 +196,39 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
 
     new SettingEx(this.containerEl)
-      .setName('Should duplicate collected attachments')
+      .setName('Collect attachment used by multiple notes mode')
       .setDesc(createFragment((f) => {
-        f.appendText('If enabled, for attachments processed via ');
-        appendCodeBlock(f, 'Collect attachments');
-        f.appendText(' command, that are linked by multiple notes, duplicate copy of those attachments will be created for each note.');
+        f.appendText('When the collected attachment is used by multiple notes:');
         f.createEl('br');
-        f.appendText('When disabled, such attachments will be kept in the original location.');
+        appendCodeBlock(f, 'Skip');
+        f.appendText(' - skip the attachment and proceed to the next one.');
+        f.createEl('br');
+        appendCodeBlock(f, 'Move');
+        f.appendText(' - move the attachment to the new location.');
+        f.createEl('br');
+        appendCodeBlock(f, 'Copy');
+        f.appendText(' - copy the attachment to the new location.');
+        f.createEl('br');
+        appendCodeBlock(f, 'Cancel');
+        f.appendText(' - cancel the attachment collecting.');
+        f.createEl('br');
+        appendCodeBlock(f, 'Prompt');
+        f.appendText(' - prompt the user to select the action.');
       }))
-      .addToggle((toggle) => {
-        this.bind(toggle, 'shouldDuplicateCollectedAttachments');
+      .addDropdown((dropdown) => {
+        dropdown.addOptions({
+          /* eslint-disable perfectionist/sort-objects */
+          [CollectAttachmentUsedByMultipleNotesMode.Skip]: 'Skip',
+          [CollectAttachmentUsedByMultipleNotesMode.Move]: 'Move',
+          [CollectAttachmentUsedByMultipleNotesMode.Copy]: 'Copy',
+          [CollectAttachmentUsedByMultipleNotesMode.Cancel]: 'Cancel',
+          [CollectAttachmentUsedByMultipleNotesMode.Prompt]: 'Prompt'
+          /* eslint-enable perfectionist/sort-objects */
+        });
+        this.bind(dropdown, 'collectAttachmentUsedByMultipleNotesMode', {
+          componentToPluginSettingsValueConverter: (value) => getEnumValue(CollectAttachmentUsedByMultipleNotesMode, value),
+          pluginSettingsToComponentValueConverter: (value) => getEnumKey(CollectAttachmentUsedByMultipleNotesMode, value)
+        });
       });
 
     new SettingEx(this.containerEl)
@@ -231,13 +257,13 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     new SettingEx(this.containerEl)
       .setName('Empty attachment folder behavior')
       .setDesc(createFragment((f) => {
-        f.appendText('When the attachment folder becomes empty, ');
+        f.appendText('When the attachment folder becomes empty:');
         f.createEl('br');
         appendCodeBlock(f, 'Keep');
-        f.appendText(' - will keep the empty attachment folder, ');
+        f.appendText(' - will keep the empty attachment folder.');
         f.createEl('br');
         appendCodeBlock(f, 'Delete');
-        f.appendText(' - will delete the empty attachment folder, ');
+        f.appendText(' - will delete the empty attachment folder.');
         f.createEl('br');
         appendCodeBlock(f, 'Delete with empty parents');
         f.appendText(' - will delete the empty attachment folder and its empty parent folders.');
@@ -266,14 +292,14 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     new SettingEx(this.containerEl)
       .setName('Include paths')
       .setDesc(createFragment((f) => {
-        f.appendText('Include notes from the following paths');
+        f.appendText('Include notes from the following paths.');
         f.createEl('br');
-        f.appendText('Insert each path on a new line');
+        f.appendText('Insert each path on a new line.');
         f.createEl('br');
         f.appendText('You can use path string or ');
-        appendCodeBlock(f, '/regular expression/');
+        appendCodeBlock(f, '/regular expression/.');
         f.createEl('br');
-        f.appendText('If the setting is empty, all notes are included');
+        f.appendText('If the setting is empty, all notes are included.');
       }))
       .addMultipleText((multipleText) => {
         this.bind(multipleText, 'includePaths');
@@ -282,14 +308,14 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     new SettingEx(this.containerEl)
       .setName('Exclude paths')
       .setDesc(createFragment((f) => {
-        f.appendText('Exclude notes from the following paths');
+        f.appendText('Exclude notes from the following paths.');
         f.createEl('br');
-        f.appendText('Insert each path on a new line');
+        f.appendText('Insert each path on a new line.');
         f.createEl('br');
         f.appendText('You can use path string or ');
-        appendCodeBlock(f, '/regular expression/');
+        appendCodeBlock(f, '/regular expression/.');
         f.createEl('br');
-        f.appendText('If the setting is empty, no notes are excluded');
+        f.appendText('If the setting is empty, no notes are excluded.');
       }))
       .addMultipleText((multipleText) => {
         this.bind(multipleText, 'excludePaths');
@@ -302,10 +328,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         appendCodeBlock(f, 'Collect attachments');
         f.appendText(' command is executed.');
         f.createEl('br');
-        f.appendText('Insert each path on a new line');
+        f.appendText('Insert each path on a new line.');
         f.createEl('br');
         f.appendText('You can use path string or ');
-        appendCodeBlock(f, '/regular expression/');
+        appendCodeBlock(f, '/regular expression/.');
         f.createEl('br');
         f.appendText('If the setting is empty, no paths are excluded from attachment collecting.');
       }))
@@ -344,14 +370,18 @@ exports.myCustomToken2 = async (substitutions, format) => {
         f.createEl('br');
         f.appendText('By default, ');
         appendCodeBlock(f, '.md');
-        f.appendText(' and ');
+        f.appendText(', ');
         appendCodeBlock(f, '.canvas');
+        f.appendText(' and ');
+        appendCodeBlock(f, '.base');
         f.appendText(' linked files are not treated as attachments and are not moved with the note.');
         f.createEl('br');
         f.appendText('You can add custom extensions, e.g. ');
         appendCodeBlock(f, '.foo.md');
         f.appendText(', ');
         appendCodeBlock(f, '.bar.canvas');
+        f.appendText(', ');
+        appendCodeBlock(f, '.baz.base');
         f.appendText(', to override this behavior.');
       }))
       .addMultipleText((multipleText) => {

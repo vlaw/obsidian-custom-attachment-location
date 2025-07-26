@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## 8.5.0
+
+- Add choice for CollectAttachmentUsedByMultipleNotesMode
+- Reformat settings tab
+- Update libs
+
+## 8.4.2
+
+- Add base examples
+- Add more logging
+- Update libs
+
+## 8.4.1
+
+- Update libs
+
+## 8.4.0
+
+- generatedAttachmentFileName/generatedAttachmentFilePath
+- Fix outdated descriptions
+- Update libs
+
+## 8.3.1
+
+- Properly exclude paths (Fixes #175)
+
+## 8.3.0
+
+- Add left/right formatting (fixes #174)
+- Update libs
+
 ## 8.2.2-CP2
 
 - fix: lint:fix
