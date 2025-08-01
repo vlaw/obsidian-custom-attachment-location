@@ -5,7 +5,7 @@ import type {
 import type { Promisable } from 'type-fest';
 
 import moment from 'moment';
-import { getNestedPropertyValue } from 'obsidian-dev-utils/Object';
+import { getNestedPropertyValue } from 'obsidian-dev-utils/ObjectUtils';
 import { getFileOrNull } from 'obsidian-dev-utils/obsidian/FileSystem';
 import { prompt } from 'obsidian-dev-utils/obsidian/Modals/Prompt';
 import {
@@ -36,6 +36,19 @@ const MORE_THAN_TWO_DOTS_REG_EXP = /^\.{3,}$/;
 const TRAILING_DOTS_AND_SPACES_REG_EXP = /[. ]+$/;
 export const INVALID_FILENAME_PATH_CHARS_REG_EXP = /[\\/:*?"<>|]/;
 export const SUBSTITUTION_TOKEN_REG_EXP = /\${(?<Token>.+?)(?::(?<Format>.+?))?}/g;
+
+interface SubstitutionsContract {
+  app: App;
+  fillTemplate(template: string): Promise<string>;
+  generatedAttachmentFileName: string;
+  generatedAttachmentFilePath: string;
+  noteFileName: string;
+  noteFilePath: string;
+  noteFolderName: string;
+  noteFolderPath: string;
+  originalAttachmentFileExtension: string;
+  originalAttachmentFileName: string;
+}
 
 interface SubstitutionsOptions {
   app: App;
@@ -116,11 +129,41 @@ function formatFileSize(sizeInBytes: number, format: string): string {
   }
 }
 
+function formatFolderName(folderPath: string, format: string): string {
+  const folderParts = folderPath.split('/');
+  let folderPartIndex = folderParts.length - 1;
+
+  let commaIndex = format.indexOf(',');
+  const NOT_FOUND_INDEX = -1;
+  if (commaIndex === NOT_FOUND_INDEX) {
+    commaIndex = format.length;
+  }
+  const format1 = format.slice(0, commaIndex);
+  const format2 = format.slice(commaIndex + 1);
+
+  const format1WithParameter = parseFormatWithParameter(format1);
+  switch (format1WithParameter.base) {
+    case 'indexFromEnd':
+      folderPartIndex = folderParts.length - 1 - (format1WithParameter.parameter ?? 0);
+      break;
+    case 'indexFromStart':
+      folderPartIndex = format1WithParameter.parameter ?? 0;
+      break;
+    default:
+      if (format2) {
+        throw new Error(`Invalid format: ${format1}`);
+      }
+      return formatFileName(folderParts[folderPartIndex] ?? '', format1);
+  }
+
+  const folderName = folderParts[folderPartIndex] ?? '';
+  return formatFileName(folderName, format2);
+}
+
 /**
  * 生成附件文件的 MD5 哈希值，如果没有提供附件文件，则使用 UUID 作为替代。
- * @param app Obsidian 的 App 对象
- * @param attachmentFile 要生成 MD5 的附件文件，如果没有提供，则会使用 UUID 作为替代
  * @returns 返回生成的 MD5 字符串，如果没有提供附件文件，则返回 UUID
+ * @param attachmentFileData
  */
 function generateMd5(attachmentFileData: ArrayBuffer | undefined): string {
   if (!attachmentFileData) {
@@ -182,26 +225,27 @@ function getFrontmatterValue(app: App, filePath: string, key: string): string {
   return String(value);
 }
 
-export class Substitutions {
+export class Substitutions implements SubstitutionsContract {
   private static readonly formatters = new Map<string, Formatter>();
   static {
     this.registerCustomFormatters('');
   }
 
+  public readonly app: App;
+
+  public readonly generatedAttachmentFileName: string;
+  public readonly generatedAttachmentFilePath: string;
+  public readonly noteFileName: string;
+  public readonly noteFilePath: string;
+  public readonly noteFolderName: string;
   public readonly noteFolderPath: string;
 
-  private readonly app: App;
-
+  public readonly originalAttachmentFileExtension: string;
+  public readonly originalAttachmentFileName: string;
   // Hack
   private readonly attachmentFileData: ArrayBuffer | undefined;
+
   private attachmentFileSizeInBytes: number;
-  private readonly generatedAttachmentFileName: string;
-  private readonly generatedAttachmentFilePath: string;
-  private readonly noteFileName: string;
-  private readonly noteFilePath: string;
-  private readonly noteFolderName: string;
-  private readonly originalAttachmentFileExtension: string;
-  private readonly originalAttachmentFileName: string;
 
   public constructor(options: SubstitutionsOptions) {
     this.app = options.app;
@@ -241,7 +285,7 @@ export class Substitutions {
 
     this.registerFormatter('noteFileName', (substitutions, format) => formatFileName(substitutions.noteFileName, format));
     this.registerFormatter('noteFilePath', (substitutions) => substitutions.noteFilePath);
-    this.registerFormatter('noteFolderName', (substitutions, format) => formatFileName(substitutions.noteFolderName, format));
+    this.registerFormatter('noteFolderName', (substitutions, format) => formatFolderName(substitutions.noteFolderPath, format));
     this.registerFormatter('noteFolderPath', (substitutions) => substitutions.noteFolderPath);
 
     this.registerFormatter('frontmatter', (substitutions, key) => getFrontmatterValue(substitutions.app, substitutions.noteFilePath, key));
@@ -292,7 +336,7 @@ export class Substitutions {
       defaultValue: this.originalAttachmentFileName,
       // eslint-disable-next-line no-template-curly-in-string
       title: 'Provide a value for ${prompt} template',
-      valueValidator: (value) => validateFileName(value, false)
+      valueValidator: (value) => validateFileName(this.app, value, false)
     });
     if (promptResult === null) {
       throw new Error('Prompt cancelled');
@@ -301,12 +345,11 @@ export class Substitutions {
   }
 }
 
-export function validateFileName(fileName: string, areTokensAllowed = true): string {
+export async function validateFileName(app: App, fileName: string, areTokensAllowed = true): Promise<string> {
   if (areTokensAllowed) {
-    fileName = removeTokenFormatting(fileName);
-    const unknownToken = validateTokens(fileName);
-    if (unknownToken) {
-      return `Unknown token: ${unknownToken}`;
+    const validationMessage = await validateTokens(app, fileName);
+    if (validationMessage) {
+      return validationMessage;
     }
   } else {
     const match = fileName.match(SUBSTITUTION_TOKEN_REG_EXP);
@@ -314,6 +357,8 @@ export function validateFileName(fileName: string, areTokensAllowed = true): str
       return 'Tokens are not allowed in file name';
     }
   }
+
+  fileName = removeTokenFormatting(fileName);
 
   if (fileName === '.' || fileName === '..') {
     return '';
@@ -338,10 +383,9 @@ export function validateFileName(fileName: string, areTokensAllowed = true): str
   return '';
 }
 
-export function validatePath(path: string, areTokensAllowed = true): string {
+export async function validatePath(app: App, path: string, areTokensAllowed = true): Promise<string> {
   if (areTokensAllowed) {
-    path = removeTokenFormatting(path);
-    const unknownToken = validateTokens(path);
+    const unknownToken = await validateTokens(app, path);
     if (unknownToken) {
       return `Unknown token: ${unknownToken}`;
     }
@@ -352,6 +396,8 @@ export function validatePath(path: string, areTokensAllowed = true): string {
     }
   }
 
+  path = removeTokenFormatting(path);
+
   path = trimStart(path, '/');
   path = trimEnd(path, '/');
 
@@ -361,7 +407,7 @@ export function validatePath(path: string, areTokensAllowed = true): string {
 
   const parts = path.split('/');
   for (const part of parts) {
-    const partValidationError = validateFileName(part);
+    const partValidationError = await validateFileName(app, part);
 
     if (partValidationError) {
       return partValidationError;
@@ -401,12 +447,28 @@ function slugifyEx(str: string): string {
   });
 }
 
-function validateTokens(str: string): null | string {
+async function validateTokens(app: App, str: string): Promise<null | string> {
+  const FAKE_SUBSTITUTION = new Substitutions({
+    app,
+    noteFilePath: ''
+  });
+
   const matches = str.matchAll(SUBSTITUTION_TOKEN_REG_EXP);
   for (const match of matches) {
-    const token = match[1] ?? '';
+    const token = match.groups?.['Token'] ?? '';
     if (!Substitutions.isRegisteredToken(token)) {
-      return token;
+      return `Unknown token: ${token}`;
+    }
+    const format = match.groups?.['Format'] ?? '';
+    if (format) {
+      const singleFormats = format.split(',');
+      for (const singleFormat of singleFormats) {
+        try {
+          await FAKE_SUBSTITUTION.fillTemplate(`\${${token}:${singleFormat}}`);
+        } catch {
+          return `Token ${token} is used with unknown format: ${singleFormat}`;
+        }
+      }
     }
   }
   return null;

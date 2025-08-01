@@ -1,15 +1,15 @@
 # CHANGELOG
 
+## 8.6.0
+
+- Validate formats
+- Allow multi-format for syntax highlighting
+- Add indexFromStart/indexFromEnd
+- Update libs
+
 ## 8.5.3-beta.1
 
-- Merge tag 'tags/8.5.2' 8.5.2 # Conflicts: #	CHANGELOG.md #	manifest.json #	package-lock.json #	package.json #	versions.json
-- 8.5.0-CP1
-- Merge tag 'tags/8.5.0' 8.5.0
-- 8.2.2-CP2 - feat: 支持paste重命名 - chore(help.sh): 移出多Vault支持
-- feat: md5 token
-- chore: add help script
-- chore: install ts-md5
-- chore: update version for customized patch
+- feat: 支持paste重命名
 
 ## 8.5.2
 
