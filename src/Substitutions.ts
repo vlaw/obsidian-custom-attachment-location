@@ -239,12 +239,10 @@ export class Substitutions implements SubstitutionsContract {
   public readonly noteFilePath: string;
   public readonly noteFolderName: string;
   public readonly noteFolderPath: string;
-
   public readonly originalAttachmentFileExtension: string;
   public readonly originalAttachmentFileName: string;
   // Hack
   private readonly attachmentFileData: ArrayBuffer | undefined;
-
   private attachmentFileSizeInBytes: number;
 
   public constructor(options: SubstitutionsOptions) {
@@ -261,6 +259,7 @@ export class Substitutions implements SubstitutionsContract {
     this.originalAttachmentFileExtension = originalAttachmentFileExtension.slice(1);
 
     this.attachmentFileSizeInBytes = options.attachmentFileSizeInBytes ?? 0;
+
     this.generatedAttachmentFileName = options.generatedAttachmentFileName ?? '';
     this.generatedAttachmentFilePath = options.generatedAttachmentFilePath ?? '';
 
