@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 8.6.1-beta.1
+
+- Merge tag 'tags/8.6.0' 8.6.0
+
 ## 8.6.0
 
 - Validate formats
