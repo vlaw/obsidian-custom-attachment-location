@@ -6,10 +6,14 @@
 - chore: add help script
 - chore: install ts-md5
 
+## 9.0.6
+
+- Update libs
+
 ## 9.0.5
 
 - removeUndefinedProperties (#186, #188)
-- Refactor abortSignal  (#186, #188)
+- Refactor abortSignal (#186, #188)
 - Update libs
 
 ## 9.0.4
