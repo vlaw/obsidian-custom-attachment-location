@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 9.0.6-beta.1
+
+- feat: add md5 token
+- chore: add help script
+- chore: install ts-md5
+
 ## 9.0.5
 
 - removeUndefinedProperties (#186, #188)
