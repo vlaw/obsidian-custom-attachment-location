@@ -25,6 +25,7 @@ import {
 } from 'obsidian-dev-utils/String';
 // eslint-disable-next-line import-x/no-rename-default
 import slugify_ from 'slugify';
+import { Md5 } from 'ts-md5';
 
 import type { TokenEvaluatorContext } from './TokenEvaluatorContext.ts';
 
@@ -187,6 +188,22 @@ function formatString(str: string, format: string): string {
   }
 }
 
+/**
+ * 生成附件文件的 MD5 哈希值，如果没有提供附件文件，则使用 UUID 作为替代。
+ * @returns 返回生成的 MD5 字符串，如果没有提供附件文件，则返回 UUID
+ * @param attachmentFileData
+ */
+function generateMd5(attachmentFileData: ArrayBuffer | undefined): string {
+  if (!attachmentFileData) {
+    console.warn('fall back to uuid');
+    return generateRandomValue('uuid');
+  }
+
+  const md5 = new Md5();
+  md5.appendByteArray(new Uint8Array(attachmentFileData));
+  return md5.end() as string;
+}
+
 function generateRandomValue(format: string): string {
   if (format === 'uuid') {
     return crypto.randomUUID();
@@ -344,6 +361,8 @@ export class Substitutions {
     this.registerToken('generatedAttachmentFilePath', (ctx) => ctx.generatedAttachmentFilePath);
 
     this.registerToken('heading', async (ctx, substitutions) => substitutions.getHeading(ctx.format));
+
+    this.registerToken('md5', (ctx) => generateMd5(ctx.attachmentFileContent));
 
     const customTokens = parseCustomTokens(customTokensStr) ?? new Map<string, TokenEvaluator>();
     for (const [token, evaluator] of customTokens.entries()) {
