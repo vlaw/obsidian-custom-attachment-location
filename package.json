@@ -42,6 +42,7 @@
   },
   "type": "module",
   "dependencies": {
+    "dompurify": "^3.2.4",
     "ts-md5": "^1.3.1"
   }
 }
