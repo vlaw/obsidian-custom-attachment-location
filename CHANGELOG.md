@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 9.0.7-beta.1
+
+- chore: 锁定`dompurify`版本到`3.2.4`
+- chore(git-town): setup
+- chore: 修改发布方式到BRAT, 移出help.sh
+
 ## 9.0.6-beta.1
 
 - feat: add md5 token
