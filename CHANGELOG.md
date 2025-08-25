@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 9.2.3-beta.1
+
+- chore(git-town): setup
+- chore: 修改发布方式到BRAT, 移出help.sh
+
 ## 9.2.2
 
 - Update libs
@@ -30,11 +35,6 @@
 - More abort signals
 - Update libs
 
-## 9.0.7-beta.1
-
-- chore: 锁定`dompurify`版本到`3.2.4`
-- chore(git-town): setup
-- chore: 修改发布方式到BRAT, 移出help.sh
 
 ## 9.0.6
 
