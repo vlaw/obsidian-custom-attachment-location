@@ -1,20 +1,50 @@
 # CHANGELOG
 
+## 9.2.2
+
+- Update libs
+
+## 9.2.1
+
+- Rephrase
+- Add link to use cases
+- Update libs
+
+## 9.2.0
+
+- Add warning with link
+- Add warning to README
+
+## 9.1.0
+
+- Add obsidian to context
+
+## 9.0.8
+
+- getOsUnsafePathCharsRegExp
+- Update libs
+
+## 9.0.7
+
+- Use platform-specific getInvalidFileNamePathCharsRegExp (#189)
+- More abort signals
+- Update libs
+
 ## 9.0.7-beta.1
 
 - chore: 锁定`dompurify`版本到`3.2.4`
 - chore(git-town): setup
 - chore: 修改发布方式到BRAT, 移出help.sh
 
+## 9.0.6
+
+- Update libs
+
 ## 9.0.6-beta.1
 
 - feat: add md5 token
 - chore: add help script
 - chore: install ts-md5
-
-## 9.0.6
-
-- Update libs
 
 ## 9.0.5
 

@@ -5,6 +5,8 @@ import type {
 import type { Promisable } from 'type-fest';
 
 import moment from 'moment';
+// eslint-disable-next-line import-x/no-namespace
+import * as obsidian from 'obsidian';
 import { printError } from 'obsidian-dev-utils/Error';
 import {
   extractDefaultExportInterop,
@@ -12,6 +14,7 @@ import {
 } from 'obsidian-dev-utils/ObjectUtils';
 import { getFileOrNull } from 'obsidian-dev-utils/obsidian/FileSystem';
 import { getCacheSafe } from 'obsidian-dev-utils/obsidian/MetadataCache';
+import { getOsUnsafePathCharsRegExp } from 'obsidian-dev-utils/obsidian/Validation';
 import {
   basename,
   dirname,
@@ -52,7 +55,6 @@ type HeadingLevel = (typeof HEADING_LEVELS)[number];
 
 const MORE_THAN_TWO_DOTS_REG_EXP = /^\.{3,}$/;
 const TRAILING_DOTS_REG_EXP = /\.+$/;
-export const INVALID_FILENAME_PATH_CHARS_REG_EXP = /[\\/:*?"<>|]/;
 const SUBSTITUTION_TOKEN_REG_EXP = /\${(?<Token>.+?)(?::(?<Format>.*?))?}/g;
 
 export enum TokenValidationMode {
@@ -396,6 +398,7 @@ export class Substitutions {
         noteFilePath: this.noteFilePath,
         noteFolderName: this.noteFolderName,
         noteFolderPath: this.noteFolderPath,
+        obsidian,
         originalAttachmentFileExtension: this.originalAttachmentFileExtension,
         originalAttachmentFileName: this.originalAttachmentFileName,
         token,
@@ -508,7 +511,7 @@ export async function validateFileName(options: ValidateFileNameOptions): Promis
     return options.isEmptyAllowed ? '' : 'File name is empty';
   }
 
-  if (INVALID_FILENAME_PATH_CHARS_REG_EXP.test(cleanFileName)) {
+  if (getOsUnsafePathCharsRegExp().test(cleanFileName)) {
     return `File name "${options.fileName}" contains invalid symbols`;
   }
 

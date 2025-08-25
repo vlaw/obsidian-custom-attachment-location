@@ -29,6 +29,14 @@ Format for the URL that will be inserted into Markdown.
 
 - See available [tokens](#tokens).
 
+> [!WARNING]
+>
+> This setting is needed for very specific [use cases](https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/152). For majority of users, it should stay blank.
+>
+> - If set, all links to attachments will be created as markdown links, even if Obsidian settings are configured to use `[[Wikilinks]]`.
+> - If set to `${generatedAttachmentFilePath}`, it is almost the same as leaving it blank, considering the previous bullet point. Leave this setting blank instead.
+> - If set to `${noteFilePath}`, the most likely it is not what you need, as it will insert link to the note itself, instead of the attachment files. Some users reported they have this incorrect value set automatically during the invalid update. Leave this setting blank instead.
+
 ### Should rename attachment folder
 
 Automatically update attachment folder name if [Location for New Attachments](#location-for-new-attachments) contains `${noteFileName}`.
@@ -260,18 +268,18 @@ Random value.
 
 You can define custom tokens in the `Custom tokens` setting.
 
-The custom tokens are defined as a functions, both sync and async are supported.
+The custom tokens are defined as functions, both sync and async are supported.
 
 Example:
 
 ```javascript
 registerCustomToken('foo', (ctx) => {
-  return ctx.noteFileName + ctx.app.appId + ctx.format;
+  return ctx.noteFileName + ctx.app.appId + ctx.format + ctx.obsidian.apiVersion;
 });
 
 registerCustomToken('bar', async (ctx) => {
   await sleep(100);
-  return ctx.noteFileName + ctx.app.appId + ctx.format;
+  return ctx.noteFileName + ctx.app.appId + ctx.format + ctx.obsidian.apiVersion;
 });
 
 registerCustomToken('baz', async (ctx) => {
