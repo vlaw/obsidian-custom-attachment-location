@@ -45,6 +45,7 @@ class LegacySettings {
   public replaceWhitespace = false;
   public shouldDuplicateCollectedAttachments = false;
   public shouldKeepEmptyAttachmentFolders = false;
+  public shouldRenameAttachments = true;
   public shouldRenameAttachmentsToLowerCase = false;
   public toLowerCase = false;
   public whitespaceReplacement = '';
@@ -84,6 +85,10 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
 
       if (legacySettings.autoRenameFolder !== undefined) {
         legacySettings.shouldRenameAttachmentFolder = legacySettings.autoRenameFolder;
+      }
+
+      if (legacySettings.shouldRenameAttachments !== undefined) {
+        legacySettings.shouldRenameAttachmentFolder = legacySettings.shouldRenameAttachments;
       }
 
       if (legacySettings.deleteOrphanAttachments !== undefined) {
@@ -199,13 +204,11 @@ ${commentOut(legacySettings.customTokensStr)}
         areTokensAllowed: true,
         path: value
       }));
-    this.registerValidator('generatedAttachmentFileName', (value) =>
-      validateFileName({
+    this.registerValidator('generatedAttachmentFileName', async (value) =>
+      await validatePath({
         app: this.app,
-        areSingleDotsAllowed: false,
-        fileName: value,
-        isEmptyAllowed: false,
-        tokenValidationMode: TokenValidationMode.Validate
+        areTokensAllowed: true,
+        path: value
       }));
     this.registerValidator('specialCharacters', (value): MaybeReturn<string> => {
       if (value.includes('/')) {

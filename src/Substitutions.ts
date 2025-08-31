@@ -1,5 +1,6 @@
 import type {
   App,
+  Stat,
   TFile
 } from 'obsidian';
 import type { Promisable } from 'type-fest';
@@ -12,6 +13,7 @@ import {
   extractDefaultExportInterop,
   getNestedPropertyValue
 } from 'obsidian-dev-utils/ObjectUtils';
+import { DUMMY_PATH } from 'obsidian-dev-utils/obsidian/AttachmentPath';
 import { getFileOrNull } from 'obsidian-dev-utils/obsidian/FileSystem';
 import { getCacheSafe } from 'obsidian-dev-utils/obsidian/MetadataCache';
 import { getOsUnsafePathCharsRegExp } from 'obsidian-dev-utils/obsidian/Validation';
@@ -35,8 +37,6 @@ import type { TokenEvaluatorContext } from './TokenEvaluatorContext.ts';
 import { promptWithPreview } from './PromptWithPreviewModal.ts';
 
 const slugify = extractDefaultExportInterop(slugify_);
-
-const VALIDATION_PATH = '__VALIDATION__';
 
 interface FormatWithParameter {
   base: string;
@@ -70,6 +70,7 @@ type RegisterCustomTokensWrapperFn = (registerCustomToken: RegisterCustomTokenFn
 interface SubstitutionsOptions {
   app: App;
   attachmentFileContent?: ArrayBuffer | undefined;
+  attachmentFileStat?: Stat | undefined;
   generatedAttachmentFileName?: string;
   generatedAttachmentFilePath?: string;
   noteFilePath: string;
@@ -259,19 +260,17 @@ async function prompt(ctx: TokenEvaluatorContext): Promise<string> {
   // Validate format
   formatString('', ctx.format);
 
-  if (ctx.noteFilePath === VALIDATION_PATH) {
-    return '';
+  if (ctx.originalAttachmentFileName === DUMMY_PATH) {
+    return DUMMY_PATH;
   }
 
   const promptResult = await promptWithPreview({
     ctx,
     valueValidator: (value) =>
-      validateFileName({
+      validatePath({
         app: ctx.app,
-        areSingleDotsAllowed: true,
-        fileName: value,
-        isEmptyAllowed: true,
-        tokenValidationMode: TokenValidationMode.Error
+        areTokensAllowed: false,
+        path: value
       })
   });
   if (promptResult === null) {
@@ -289,6 +288,7 @@ export class Substitutions {
   public readonly noteFolderPath: string;
   private readonly app: App;
   private readonly attachmentFileContent: ArrayBuffer | undefined;
+  private readonly attachmentFileStat: Stat | undefined;
   private readonly cursorLine: null | number;
   private readonly generatedAttachmentFileName: string;
   private readonly generatedAttachmentFilePath: string;
@@ -313,6 +313,7 @@ export class Substitutions {
     this.originalAttachmentFileExtension = originalAttachmentFileExtension.slice(1);
 
     this.attachmentFileContent = options.attachmentFileContent;
+    this.attachmentFileStat = options.attachmentFileStat;
 
     this.generatedAttachmentFileName = options.generatedAttachmentFileName ?? '';
     this.generatedAttachmentFilePath = options.generatedAttachmentFilePath ?? '';
@@ -341,6 +342,14 @@ export class Substitutions {
     this.registerToken(
       'noteFileModificationDate',
       (ctx) => formatFileDate(ctx.app, ctx.noteFilePath, ctx.format, (file) => file.stat.mtime)
+    );
+    this.registerToken(
+      'originalAttachmentFileCreationDate',
+      (ctx) => ctx.attachmentFileStat?.ctime ? moment(ctx.attachmentFileStat.ctime).format(ctx.format) : ''
+    );
+    this.registerToken(
+      'originalAttachmentFileModificationDate',
+      (ctx) => ctx.attachmentFileStat?.mtime ? moment(ctx.attachmentFileStat.mtime).format(ctx.format) : ''
     );
 
     this.registerToken('noteFileName', (ctx) => formatString(ctx.noteFileName, ctx.format));
@@ -389,6 +398,7 @@ export class Substitutions {
         abortSignal,
         app: this.app,
         attachmentFileContent: this.attachmentFileContent,
+        attachmentFileStat: this.attachmentFileStat,
         fillTemplate: this.fillTemplate.bind(this),
         format,
         fullTemplate: template,
@@ -605,7 +615,8 @@ function slugifyEx(str: string): string {
 async function validateTokens(app: App, str: string): Promise<null | string> {
   const FAKE_SUBSTITUTION = new Substitutions({
     app,
-    noteFilePath: VALIDATION_PATH
+    noteFilePath: DUMMY_PATH,
+    originalAttachmentFileName: DUMMY_PATH
   });
 
   const tokens = extractTokens(str);

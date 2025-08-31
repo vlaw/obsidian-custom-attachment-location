@@ -1,12 +1,17 @@
 import type {
   App,
-  FileManager
+  FileManager,
+  Stat
 } from 'obsidian';
 import type {
   ExtendedWrapper,
   GetAvailablePathForAttachmentsExtendedFn
 } from 'obsidian-dev-utils/obsidian/AttachmentPath';
 import type { RenameDeleteHandlerSettings } from 'obsidian-dev-utils/obsidian/RenameDeleteHandler';
+import type {
+  ClipboardManager,
+  ImportedAttachment
+} from 'obsidian-typings';
 import type {
   ConfigItem,
   SharedFile,
@@ -16,7 +21,11 @@ import type {
 import { webUtils } from 'electron';
 import moment from 'moment';
 import {
+  CapacitorAdapter,
+  FileSystemAdapter,
+  MarkdownView,
   Menu,
+  MenuItem,
   TAbstractFile,
   TFile,
   TFolder,
@@ -30,6 +39,7 @@ import { getAbstractFileOrNull } from 'obsidian-dev-utils/obsidian/FileSystem';
 import {
   encodeUrl,
   generateMarkdownLink,
+  LinkStyle,
   testAngleBrackets,
   testWikilink
 } from 'obsidian-dev-utils/obsidian/Link';
@@ -41,10 +51,13 @@ import {
 } from 'obsidian-dev-utils/obsidian/RenameDeleteHandler';
 import { createFolderSafe } from 'obsidian-dev-utils/obsidian/Vault';
 import {
+  basename,
+  dirname,
   extname,
   join,
   makeFileName
 } from 'obsidian-dev-utils/Path';
+import { trimStart } from 'obsidian-dev-utils/String';
 import { parentFolderPath } from 'obsidian-typings/implementations';
 
 import type { PluginTypes } from './PluginTypes.ts';
@@ -76,14 +89,19 @@ type SaveAttachmentFn = App['saveAttachment'];
 const PASTED_IMAGE_NAME_REG_EXP = /Pasted image (?<Timestamp>\d{14})/;
 const PASTED_IMAGE_DATE_FORMAT = 'YYYYMMDDHHmmss';
 const THRESHOLD_IN_SECONDS = 10;
+const IMPORT_FILES_PREFIX = '__IMPORT_FILES__';
+
+type ArrayBufferFn = File['arrayBuffer'];
 
 interface FileEx {
   path: string;
 }
 
 type ImportFilesFn = ShareReceiver['importFiles'];
+type InsertFilesFn = ClipboardManager['insertFiles'];
 
 export class Plugin extends PluginBase<PluginTypes> {
+  private readonly arrayBufferFileStatMap = new WeakMap<ArrayBuffer, Stat>();
   private currentAttachmentFolderPath: null | string = null;
   private getAvailablePathForAttachmentsOriginal: GetAvailablePathForAttachmentsFn | null = null;
   private lastOpenFilePath: null | string = null;
@@ -144,6 +162,25 @@ export class Plugin extends PluginBase<PluginTypes> {
         };
       }
     });
+
+    this.registerPopupDocumentDomEvent('change', this.handleInputFileChange.bind(this), { capture: true });
+
+    const tempName = `__TEMP_${crypto.randomUUID()}.md`;
+    const tempFile = await this.app.vault.create(tempName, '');
+    const leaf = this.app.workspace.getLeaf();
+    await leaf.openFile(tempFile);
+    const markdownView = leaf.view as MarkdownView;
+    const that = this;
+    registerPatch(this, getPrototypeOf(markdownView.editMode.clipboardManager), {
+      insertFiles: (next: InsertFilesFn): InsertFilesFn => {
+        return function insertFilesPatched(this: ClipboardManager, importedAttachments: ImportedAttachment[]): Promise<void> {
+          return that.insertFiles(next, this, importedAttachments);
+        };
+      }
+    });
+    await markdownView.close();
+    leaf.detach();
+    await this.app.vault.delete(tempFile);
   }
 
   protected override async onloadImpl(): Promise<void> {
@@ -195,6 +232,27 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     this.registerEvent(this.app.workspace.on('file-open', convertAsyncToSync(this.handleFileOpen.bind(this))));
     this.registerEvent(this.app.vault.on('rename', convertAsyncToSync(this.handleRename.bind(this))));
+
+    this.registerEvent(this.app.workspace.on('receive-text-menu', this.handleReceiveTextMenu.bind(this)));
+    this.registerEvent(this.app.workspace.on('receive-files-menu', this.handleReceiveFilesMenu.bind(this)));
+  }
+
+  private async fileArrayBuffer(next: ArrayBufferFn, file: File): Promise<ArrayBuffer> {
+    const arrayBuffer = await next.call(file);
+    if (this.app.vault.adapter instanceof FileSystemAdapter) {
+      const path = webUtils.getPathForFile(file);
+      if (await this.setFileStat(arrayBuffer, path)) {
+        return arrayBuffer;
+      }
+    }
+
+    this.arrayBufferFileStatMap.set(arrayBuffer, {
+      ctime: 0,
+      mtime: file.lastModified,
+      size: file.size,
+      type: 'file'
+    });
+    return arrayBuffer;
   }
 
   private generateMarkdownLink(next: GenerateMarkdownLinkFn, file: TFile, sourcePath: string, subpath?: string, alias?: string): string {
@@ -213,7 +271,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     if (testWikilink(defaultLink)) {
       defaultLink = generateMarkdownLink({
         app: this.app,
-        isWikilink: false,
+        linkStyle: LinkStyle.Markdown,
         originalLink: defaultLink,
         sourcePathOrFile: sourcePath,
         targetPathOrFile: file
@@ -233,7 +291,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const path = makeFileName(
-        suffixNum === 0 ? attachmentFileName : `${attachmentFileName}${this.settings.duplicateNameSeparator}${suffixNum.toString()}`,
+        suffixNum === 0 ? attachmentFileName : `${attachmentFileName}${this.settings.duplicateNameSeparator}${String(suffixNum)}`,
         attachmentExtension
       );
 
@@ -246,27 +304,59 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   private async getAvailablePathForAttachments(
-    attachmentFileName: string,
-    attachmentExtension: string,
+    attachmentFileBaseName: string,
+    attachmentFileExtension: string,
     noteFile: null | TFile,
     skipMissingAttachmentFolderCreation: boolean | undefined,
-    attachmentFileContent?: ArrayBuffer
+    attachmentFileContent?: ArrayBuffer,
+    shouldSkipDuplicateCheck?: boolean,
+    shouldSkipGeneratedAttachmentFileName?: boolean
   ): Promise<string> {
+    if (attachmentFileBaseName.startsWith(IMPORT_FILES_PREFIX)) {
+      attachmentFileBaseName = trimStart(attachmentFileBaseName, IMPORT_FILES_PREFIX);
+      shouldSkipGeneratedAttachmentFileName = true;
+    }
     if (noteFile && this.settings.isPathIgnored(noteFile.path) && this.getAvailablePathForAttachmentsOriginal) {
-      return this.getAvailablePathForAttachmentsOriginal(attachmentFileName, attachmentExtension, noteFile);
+      return this.getAvailablePathForAttachmentsOriginal(attachmentFileBaseName, attachmentFileExtension, noteFile);
     }
 
     let attachmentPath: string;
     if (!noteFile || !isNoteEx(this, noteFile)) {
-      attachmentPath = await getAvailablePathForAttachments(this.app, attachmentFileName, attachmentExtension, noteFile, true);
+      attachmentPath = await getAvailablePathForAttachments(
+        this.app,
+        attachmentFileBaseName,
+        attachmentFileExtension,
+        noteFile,
+        true,
+        shouldSkipDuplicateCheck ?? false
+      );
     } else {
+      const attachmentFileName = makeFileName(attachmentFileBaseName, attachmentFileExtension);
       const attachmentFolderFullPath = await getAttachmentFolderFullPathForPath(
         this,
         noteFile.path,
-        makeFileName(attachmentFileName, attachmentExtension),
+        attachmentFileName,
         attachmentFileContent
       );
-      attachmentPath = this.app.vault.getAvailablePath(join(attachmentFolderFullPath, attachmentFileName), attachmentExtension);
+      const generatedAttachmentFileName = shouldSkipGeneratedAttachmentFileName
+        ? attachmentFileName
+        : await getGeneratedAttachmentFileName(
+          this,
+          new Substitutions({
+            app: this.app,
+            attachmentFileContent,
+            noteFilePath: noteFile.path,
+            originalAttachmentFileName: attachmentFileName
+          })
+        );
+      const generatedAttachmentFileNamePath = join(attachmentFolderFullPath, generatedAttachmentFileName);
+      if (shouldSkipDuplicateCheck) {
+        attachmentPath = generatedAttachmentFileNamePath;
+      } else {
+        const dir = dirname(generatedAttachmentFileNamePath);
+        const generatedAttachmentFileNameBaseName = basename(generatedAttachmentFileNamePath, attachmentFileExtension ? `.${attachmentFileExtension}` : '');
+        attachmentPath = this.app.vault.getAvailablePath(join(dir, generatedAttachmentFileNameBaseName), attachmentFileExtension);
+      }
     }
 
     if (!skipMissingAttachmentFolderCreation) {
@@ -325,6 +415,56 @@ export class Plugin extends PluginBase<PluginTypes> {
     this.currentAttachmentFolderPath = await getAttachmentFolderFullPathForPath(this, file.path, 'dummy.pdf');
   }
 
+  private handleInputFileChange(evt: Event): void {
+    if (!(evt.target instanceof HTMLInputElement)) {
+      return;
+    }
+
+    if (evt.target.type !== 'file') {
+      return;
+    }
+
+    const that = this;
+    for (const file of evt.target.files ?? []) {
+      registerPatch(this, file, {
+        arrayBuffer: (next: ArrayBufferFn): ArrayBufferFn => {
+          return function arrayBufferPatched(this: File): Promise<ArrayBuffer> {
+            return that.fileArrayBuffer(next, this);
+          };
+        }
+      });
+    }
+  }
+
+  private handleReceiveFilesMenu(menu: Menu, attachmentFiles: TFile[]): void {
+    this.handleReceiveMenuItemClick(menu, (noteFile) => {
+      const linkTexts = attachmentFiles.map((attachmentFile) => this.app.fileManager.generateMarkdownLink(attachmentFile, noteFile.path));
+      return ['', ...linkTexts, ''].join('\n');
+    });
+  }
+
+  private handleReceiveMenuItemClick(menu: Menu, prepareTextFn: (noteFile: TFile) => string): void {
+    const app = this.app;
+    const menuItem = menu.items.find((item) => item instanceof MenuItem && !!item.iconEl.querySelector('.lucide-file')) as MenuItem | undefined;
+    if (menuItem) {
+      menuItem.callback = callback;
+    }
+
+    function callback(): void {
+      const markdownView = app.workspace.getActiveViewOfType(MarkdownView);
+      if (!markdownView?.file) {
+        return;
+      }
+
+      const text = prepareTextFn(markdownView.file);
+      markdownView.editor.replaceSelection(text);
+    }
+  }
+
+  private handleReceiveTextMenu(menu: Menu, text: string): void {
+    this.handleReceiveMenuItemClick(menu, () => text);
+  }
+
   private async handleRename(): Promise<void> {
     await this.handleFileOpen(this.app.workspace.getActiveFile());
   }
@@ -342,10 +482,18 @@ export class Plugin extends PluginBase<PluginTypes> {
       });
       const attachmentFileName = await getGeneratedAttachmentFileName(this, substitutions);
       const ext = extname(file.name).slice(1);
-      file.name = makeFileName(attachmentFileName, ext);
+      file.name = IMPORT_FILES_PREFIX + makeFileName(attachmentFileName, ext);
     }
 
     return next.call(this.app.shareReceiver, files);
+  }
+
+  private async insertFiles(next: InsertFilesFn, clipboardManager: ClipboardManager, importedAttachments: ImportedAttachment[]): Promise<void> {
+    for (const importedAttachment of importedAttachments) {
+      const arrayBuffer = await importedAttachment.data;
+      await this.setFileStat(arrayBuffer, importedAttachment.filepath);
+    }
+    return next.call(clipboardManager, importedAttachments);
   }
 
   private async saveAttachment(
@@ -398,6 +546,7 @@ export class Plugin extends PluginBase<PluginTypes> {
         new Substitutions({
           app: this.app,
           attachmentFileContent,
+          attachmentFileStat: this.arrayBufferFileStatMap.get(attachmentFileContent),
           noteFilePath: activeNoteFile.path,
           originalAttachmentFileName: makeFileName(attachmentFileName, attachmentFileExtension)
         })
@@ -432,8 +581,40 @@ export class Plugin extends PluginBase<PluginTypes> {
       attachmentFileExtension,
       noteFile,
       false,
-      attachmentFileContent
+      attachmentFileContent,
+      false,
+      true
     );
     return await this.app.vault.createBinary(attachmentPath, attachmentFileContent);
+  }
+
+  private async setFileStat(arrayBuffer: ArrayBuffer, filePath: string): Promise<boolean> {
+    if (!filePath) {
+      return false;
+    }
+
+    if (this.app.vault.adapter instanceof FileSystemAdapter) {
+      const stats = await this.app.vault.adapter.fsPromises.stat(filePath);
+      this.arrayBufferFileStatMap.set(arrayBuffer, {
+        ctime: stats.ctimeMs,
+        mtime: stats.mtimeMs,
+        size: stats.size,
+        type: 'file'
+      });
+      return true;
+    }
+
+    if (this.app.vault.adapter instanceof CapacitorAdapter) {
+      const stats = await this.app.vault.adapter.fs.stat(filePath);
+      this.arrayBufferFileStatMap.set(arrayBuffer, {
+        ctime: stats.ctime ?? 0,
+        mtime: stats.mtime ?? 0,
+        size: arrayBuffer.byteLength,
+        type: 'file'
+      });
+      return true;
+    }
+
+    return false;
   }
 }

@@ -1,4 +1,7 @@
-import type { App } from 'obsidian';
+import type {
+  App,
+  Stat
+} from 'obsidian';
 
 /**
  * Context passed to token evaluators.
@@ -20,6 +23,15 @@ export interface TokenEvaluatorContext {
    * `undefined` if the attachment file content is not known.
    */
   attachmentFileContent: ArrayBuffer | undefined;
+
+  /**
+   * The stats of the attachment file.
+   *
+   * `undefined` if the attachment file stats is not known.
+   *
+   * @remark It may be initialized only partially. Uninitialized {@link Stat.ctime} and {@link Stat.mtime} will be `0`.
+   */
+  attachmentFileStat: Stat | undefined;
 
   /**
    * Fills a template with the current context.

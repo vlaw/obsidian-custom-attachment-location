@@ -46,7 +46,6 @@ export class PluginSettings {
   // eslint-disable-next-line no-magic-numbers
   public jpegQuality = 0.8;
   public markdownUrlFormat = '';
-
   public shouldConvertPastedImagesToJpeg = false;
   public shouldDeleteOrphanAttachments = false;
   public shouldRenameAttachmentFiles = false;
