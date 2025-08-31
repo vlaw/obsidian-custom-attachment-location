@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 9.8.1-beta.1
+
+- Merge tag 'tags/9.8.0' into develop 9.8.0
+
 ## 9.8.0
 
 - originalAttachmentFileCreationDate / originalAttachmentFileModificationDate
