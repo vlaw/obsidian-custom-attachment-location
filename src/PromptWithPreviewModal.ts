@@ -12,6 +12,7 @@ import {
   invokeAsyncSafely
 } from 'obsidian-dev-utils/Async';
 import { CssClass } from 'obsidian-dev-utils/CssClass';
+import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { addPluginCssClasses } from 'obsidian-dev-utils/obsidian/Plugin/PluginContext';
 
 import type { TokenEvaluatorContext } from './TokenEvaluatorContext.ts';
@@ -22,8 +23,8 @@ interface PromptWithPreviewModalOptions {
 }
 
 class PreviewModal extends Modal {
-  private embedComponent!: EmbedComponent;
-  private tempFile!: TFile;
+  private embedComponent?: EmbedComponent;
+  private tempFile?: TFile;
 
   public constructor(private readonly options: PromptWithPreviewModalOptions) {
     super(options.ctx.app);
@@ -32,9 +33,11 @@ class PreviewModal extends Modal {
 
   public override onClose(): void {
     super.onClose();
-    this.embedComponent.unload();
+    this.embedComponent?.unload();
     invokeAsyncSafely(async () => {
-      await this.app.vault.delete(this.tempFile);
+      if (this.tempFile) {
+        await this.app.vault.delete(this.tempFile);
+      }
     });
   }
 
@@ -52,7 +55,7 @@ class PreviewModal extends Modal {
 
     const fullFileName = `${this.options.ctx.originalAttachmentFileName}.${this.options.ctx.originalAttachmentFileExtension}`;
 
-    this.titleEl.setText(`Preview attachment file '${fullFileName}'`);
+    this.titleEl.setText(t(($) => $.promptWithPreviewModal.previewModal.title, { fullFileName }));
 
     const tempPath = `__temp${String(Date.now())}__${fullFileName}`;
     this.tempFile = await this.app.vault.createBinary(tempPath, this.options.ctx.attachmentFileContent);
@@ -85,15 +88,15 @@ class PromptWithPreviewModal extends Modal {
   }
 
   public override onOpen(): void {
+    super.onOpen();
+
     const title = createFragment((f) => {
-      f.appendText('Provide a value for the prompt token:');
+      f.appendText(t(($) => $.promptWithPreviewModal.title));
       f.createEl('br');
       f.appendText(this.options.ctx.fullTemplate.slice(0, this.options.ctx.tokenStartOffset));
       f.createSpan({ cls: 'highlighted-token', text: this.options.ctx.tokenWithFormat });
       f.appendText(this.options.ctx.fullTemplate.slice(this.options.ctx.tokenEndOffset));
     });
-
-    super.onOpen();
 
     this.titleEl.setText(title);
     const textComponent = new TextComponent(this.contentEl);
@@ -106,7 +109,7 @@ class PromptWithPreviewModal extends Modal {
     };
 
     textComponent.setValue(this.value);
-    textComponent.setPlaceholder('Provide a value for the prompt token');
+    textComponent.setPlaceholder(t(($) => $.promptWithPreviewModal.title));
     inputEl.addClass(CssClass.TextBox);
     textComponent.onChange((newValue) => {
       this.value = newValue;
@@ -122,19 +125,19 @@ class PromptWithPreviewModal extends Modal {
     inputEl.addEventListener('focus', convertAsyncToSync(validate));
     invokeAsyncSafely(validate);
     const okButton = new ButtonComponent(this.contentEl);
-    okButton.setButtonText('OK');
+    okButton.setButtonText(t(($) => $.obsidianDevUtils.buttons.ok));
     okButton.setCta();
     okButton.onClick((event) => {
       this.handleOk(event, textComponent);
     });
     okButton.setClass(CssClass.OkButton);
     const cancelButton = new ButtonComponent(this.contentEl);
-    cancelButton.setButtonText('Cancel');
+    cancelButton.setButtonText(t(($) => $.obsidianDevUtils.buttons.cancel));
     cancelButton.onClick(this.close.bind(this));
     cancelButton.setClass(CssClass.CancelButton);
 
     const previewButton = new ButtonComponent(this.contentEl);
-    previewButton.setButtonText('Preview attachment file');
+    previewButton.setButtonText(t(($) => $.buttons.previewAttachmentFile));
     previewButton.onClick(this.preview.bind(this));
 
     const embeddableCreator = this.app.embedRegistry.embedByExtension[this.options.ctx.originalAttachmentFileExtension];

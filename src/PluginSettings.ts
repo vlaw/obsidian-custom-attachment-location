@@ -1,3 +1,4 @@
+import { INFINITE_TIMEOUT } from 'obsidian-dev-utils/AbortController';
 import { EmptyAttachmentFolderBehavior } from 'obsidian-dev-utils/obsidian/RenameDeleteHandler';
 import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
 
@@ -22,7 +23,7 @@ export enum AttachmentRenameMode {
   None = 'None',
 
   OnlyPastedImages = 'Only pasted images',
-  // eslint-disable-next-line perfectionist/sort-enums
+  // eslint-disable-next-line perfectionist/sort-enums -- Need to keep enum order.
   All = 'All'
 }
 
@@ -34,16 +35,23 @@ export enum CollectAttachmentUsedByMultipleNotesMode {
   Skip = 'Skip'
 }
 
+export enum DefaultImageSizeDimension {
+  Height = 'height',
+  Width = 'width'
+}
+
 export class PluginSettings {
-  // eslint-disable-next-line no-template-curly-in-string
+  // eslint-disable-next-line no-template-curly-in-string -- Valid token.
   public attachmentFolderPath = './assets/${noteFileName}';
   public attachmentRenameMode: AttachmentRenameMode = AttachmentRenameMode.OnlyPastedImages;
   public collectAttachmentUsedByMultipleNotesMode: CollectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Skip;
+  public defaultImageSize = '';
+  public defaultImageSizeDimension: DefaultImageSizeDimension = DefaultImageSizeDimension.Width;
   public duplicateNameSeparator = ' ';
   public emptyAttachmentFolderBehavior: EmptyAttachmentFolderBehavior = EmptyAttachmentFolderBehavior.DeleteWithEmptyParents;
-  // eslint-disable-next-line no-template-curly-in-string
+  // eslint-disable-next-line no-template-curly-in-string -- Valid token.
   public generatedAttachmentFileName = 'file-${date:YYYYMMDDHHmmssSSS}';
-  // eslint-disable-next-line no-magic-numbers
+  // eslint-disable-next-line no-magic-numbers -- Magic numbers are OK in settings.
   public jpegQuality = 0.8;
   public markdownUrlFormat = '';
   public shouldConvertPastedImagesToJpeg = false;
@@ -51,10 +59,12 @@ export class PluginSettings {
   public shouldRenameAttachmentFiles = false;
   public shouldRenameAttachmentFolder = true;
   public shouldRenameCollectedAttachments = false;
-  public specialCharacters = '#^[]|*\\<>:?';
+  public specialCharacters = '#^[]|*\\<>:?/';
   public specialCharactersReplacement = '-';
+  // eslint-disable-next-line no-magic-numbers -- Magic numbers are OK in settings.
+  public timeoutInSeconds = 5;
   public treatAsAttachmentExtensions: readonly string[] = ['.excalidraw.md'];
-  public warningVersion = '';
+  public version = '';
   public get customTokensStr(): string {
     return this._customTokensStr;
   }
@@ -91,7 +101,7 @@ export class PluginSettings {
   }
 
   public get specialCharactersRegExp(): RegExp {
-    return new RegExp(`[${escapeRegExp(this.specialCharacters)}]+`, 'g');
+    return new RegExp(`[${escapeRegExp(this.specialCharacters)}]+`, 'gu');
   }
 
   private _customTokensStr = '';
@@ -107,6 +117,11 @@ export class PluginSettings {
   private _includePaths: string[] = [];
 
   private _includePathsRegExp = ALWAYS_MATCH_REG_EXP;
+
+  public getTimeoutInMilliseconds(): number {
+    const MILLISECONDS_PER_SECOND = 1000;
+    return this.timeoutInSeconds === 0 ? INFINITE_TIMEOUT : this.timeoutInSeconds * MILLISECONDS_PER_SECOND;
+  }
 
   public isExcludedFromAttachmentCollecting(path: string): boolean {
     return this._excludePathsFromAttachmentCollectingRegExp.test(path);

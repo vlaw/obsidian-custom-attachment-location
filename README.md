@@ -242,13 +242,21 @@ File name of the original attachment file.
 
 Original attachment file creation date/time. Empty if unknown.
 
-**Format**: [Moment.js formatting][Moment.js formatting].
+**Format**:
+
+- [Moment.js formatting][Moment.js formatting]. **Example** `YYYY-MM-DD`: `2025-09-01`.
+- **`format,default=empty`** (same as above, but explicit): Use empty string if the original date was not available.
+- **`format,default=now`**: Use current time if the original date was not available.
 
 ### `${originalAttachmentFileModificationDate}`
 
 Original attachment file modification date/time. Empty if unknown.
 
-**Format**: [Moment.js formatting][Moment.js formatting].
+**Format**:
+
+- [Moment.js formatting][Moment.js formatting]. **Example** `YYYY-MM-DD`: `2025-09-01`.
+- **`format,default=empty`** (same as above, but explicit): Use empty string if the original date was not available.
+- **`format,default=now`**: Use current time if the original date was not available.
 
 ### `${prompt}`
 
@@ -333,7 +341,9 @@ For more details, refer to the [documentation](https://github.com/mnaoumov/obsid
 
 ## Support
 
-<a href="https://www.buymeacoffee.com/mnaoumov" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;"></a>
+<!-- markdownlint-disable MD033 -->
+<a href="https://www.buymeacoffee.com/mnaoumov" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="60" width="217"></a>
+<!-- markdownlint-enable MD033 -->
 
 ## License
 

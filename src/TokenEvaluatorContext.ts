@@ -1,37 +1,87 @@
 import type {
   App,
-  Stat
+  FileStats
 } from 'obsidian';
+
+/**
+ * An action context.
+ */
+export enum ActionContext {
+  /**
+   * Collect attachments.
+   */
+  CollectAttachments = 'CollectAttachments',
+
+  /**
+   * Delete note.
+   */
+  DeleteNote = 'DeleteNote',
+
+  /**
+   * Import files.
+   */
+  ImportFiles = 'ImportFiles',
+
+  /**
+   * Open file.
+   */
+  OpenFile = 'OpenFile',
+
+  /**
+   * Rename note.
+   */
+  RenameNote = 'RenameNote',
+
+  /**
+   * Save attachment.
+   */
+  SaveAttachment = 'SaveAttachment',
+
+  /**
+   * Unknown.
+   */
+  Unknown = 'Unknown',
+
+  /**
+   * Validate tokens.
+   */
+  ValidateTokens = 'ValidateTokens'
+}
 
 /**
  * Context passed to token evaluators.
  */
 export interface TokenEvaluatorContext {
   /**
-   * The abort signal to control the execution of the function.
+   * An abort signal to control the execution of the function.
    */
   abortSignal: AbortSignal;
 
   /**
-   * The Obsidian app instance.
+   * An action context.
+   */
+  actionContext: ActionContext;
+
+  /**
+   * An Obsidian app instance.
    */
   app: App;
 
   /**
-   * The content of the attachment file.
+   * A content of the attachment file.
    *
    * `undefined` if the attachment file content is not known.
    */
   attachmentFileContent: ArrayBuffer | undefined;
 
   /**
-   * The stats of the attachment file.
+   * Stats of the attachment file.
    *
    * `undefined` if the attachment file stats is not known.
    *
-   * @remark It may be initialized only partially. Uninitialized {@link Stat.ctime} and {@link Stat.mtime} will be `0`.
+   * @remark It may be initialized only partially. Uninitialized {@link FileStats.ctime} and {@link FileStats.mtime} will be `0`.
    */
-  attachmentFileStat: Stat | undefined;
+  attachmentFileStat: FileStats | undefined;
 
   /**
    * Fills a template with the current context.
@@ -44,78 +94,98 @@ export interface TokenEvaluatorContext {
   format: string;
 
   /**
-   * The full template string.
+   * A full template string.
    */
   fullTemplate: string;
 
   /**
-   * The generated attachment file name.
+   * A generated attachment file name.
    *
    * Empty string if the attachment file name is not fully generated yet.
    */
   generatedAttachmentFileName: string;
 
   /**
-   * The generated attachment file path.
+   * A generated attachment file path.
    *
    * Empty string if the attachment file path is not fully generated yet.
    */
   generatedAttachmentFilePath: string;
 
   /**
-   * The name of the note file.
+   * A name of the note file.
    */
   noteFileName: string;
 
   /**
-   * The path of the note file.
+   * A path of the note file.
    */
   noteFilePath: string;
 
   /**
-   * The name of the note folder.
+   * A name of the note folder.
    */
   noteFolderName: string;
 
   /**
-   * The path of the note folder.
+   * A path of the note folder.
    */
   noteFolderPath: string;
 
   /**
-   * The Obsidian API.
+   * An Obsidian API.
    *
    * {@link https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts}
    */
   obsidian: typeof import('obsidian');
 
   /**
-   * The extension of the original attachment file.
+   * A name of the old note file.
+   */
+  oldNoteFileName: string;
+
+  /**
+   * A path of the old note file.
+   */
+  oldNoteFilePath: string;
+
+  /**
+   * A name of the old note folder.
+   */
+  oldNoteFolderName: string;
+
+  /**
+   * A path of the old note folder.
+   */
+  oldNoteFolderPath: string;
+
+  /**
+   * An extension of the original attachment file.
    */
   originalAttachmentFileExtension: string;
 
   /**
-   * The name of the original attachment file.
+   * A name of the original attachment file.
    */
   originalAttachmentFileName: string;
 
   /**
-   * The token being evaluated.
+   * A token being evaluated.
    */
   token: string;
 
   /**
-   * The end offset of the token within the full template.
+   * An end offset of the token within the full template.
    */
   tokenEndOffset: number;
 
   /**
-   * The start offset of the token within the full template.
+   * A start offset of the token within the full template.
    */
   tokenStartOffset: number;
 
   /**
-   * The token with the format.
+   * A token with the format.
    */
   tokenWithFormat: string;
 }

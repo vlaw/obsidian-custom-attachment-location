@@ -1,12 +1,12 @@
 import type {
   App,
-  Stat,
+  FileStats,
   TFile
 } from 'obsidian';
 import type { Promisable } from 'type-fest';
 
 import moment from 'moment';
-// eslint-disable-next-line import-x/no-namespace
+// eslint-disable-next-line import-x/no-namespace -- Need to pass entire obsidian module.
 import * as obsidian from 'obsidian';
 import { printError } from 'obsidian-dev-utils/Error';
 import {
@@ -28,13 +28,15 @@ import {
   trimEnd,
   trimStart
 } from 'obsidian-dev-utils/String';
-// eslint-disable-next-line import-x/no-rename-default
+// eslint-disable-next-line import-x/no-rename-default -- Need to rename default export.
 import slugify_ from 'slugify';
 import { Md5 } from 'ts-md5';
 
+import type { Plugin } from './Plugin.ts';
 import type { TokenEvaluatorContext } from './TokenEvaluatorContext.ts';
 
 import { promptWithPreview } from './PromptWithPreviewModal.ts';
+import { ActionContext } from './TokenEvaluatorContext.ts';
 
 const slugify = extractDefaultExportInterop(slugify_);
 
@@ -68,32 +70,35 @@ type RegisterCustomTokenFn = (token: string, evaluator: TokenEvaluator) => void;
 type RegisterCustomTokensWrapperFn = (registerCustomToken: RegisterCustomTokenFn) => void;
 
 interface SubstitutionsOptions {
-  app: App;
+  actionContext: ActionContext;
   attachmentFileContent?: ArrayBuffer | undefined;
-  attachmentFileStat?: Stat | undefined;
+  attachmentFileStat?: FileStats | undefined;
+  cursorLine?: number | undefined;
   generatedAttachmentFileName?: string;
   generatedAttachmentFilePath?: string;
   noteFilePath: string;
+  oldNoteFilePath?: string | undefined;
   originalAttachmentFileName?: string;
+  plugin: Plugin;
 }
 
 interface ValidateFileNameOptions {
-  app: App;
   areSingleDotsAllowed: boolean;
   fileName: string;
   isEmptyAllowed: boolean;
+  plugin: Plugin;
   tokenValidationMode: TokenValidationMode;
 }
 interface ValidatePathOptions {
-  app: App;
   areTokensAllowed: boolean;
   path: string;
+  plugin: Plugin;
 }
 
 export function parseCustomTokens(customTokensStr: string): Map<string, TokenEvaluator> | null {
   const evaluators = new Map<string, TokenEvaluator>();
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func -- Need to create function from string.
     const registerCustomTokensWrapperFn = new Function('registerCustomToken', customTokensStr) as RegisterCustomTokensWrapperFn;
 
     registerCustomTokensWrapperFn(registerCustomToken);
@@ -106,6 +111,30 @@ export function parseCustomTokens(customTokensStr: string): Map<string, TokenEva
   function registerCustomToken(token: string, evaluator: TokenEvaluator): void {
     evaluators.set(token, evaluator);
   }
+}
+
+function formatAttachmentFileDate(timestamp: number | undefined, format: string): string {
+  const DEFAULT_NOW_SUFFIX = ',default=now';
+  const DEFAULT_EMPTY_SUFFIX = ',default=empty';
+  let defaultBehavior: 'empty' | 'now' = 'empty';
+
+  if (format.endsWith(DEFAULT_NOW_SUFFIX)) {
+    format = trimEnd(format, DEFAULT_NOW_SUFFIX);
+    defaultBehavior = 'now';
+  } else if (format.endsWith(DEFAULT_EMPTY_SUFFIX)) {
+    format = trimEnd(format, DEFAULT_EMPTY_SUFFIX);
+    defaultBehavior = 'empty';
+  }
+
+  if (timestamp) {
+    return moment(timestamp).format(format);
+  }
+
+  if (defaultBehavior === 'now') {
+    return moment().format(format);
+  }
+
+  return '';
 }
 
 function formatDate(format: string): string {
@@ -252,31 +281,8 @@ function getFrontmatterValue(app: App, filePath: string, key: string): string {
   }
 
   const value = getNestedPropertyValue(cache.frontmatter, key) ?? '';
-  // eslint-disable-next-line @typescript-eslint/no-base-to-string
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- Need to convert to string.
   return String(value);
-}
-
-async function prompt(ctx: TokenEvaluatorContext): Promise<string> {
-  // Validate format
-  formatString('', ctx.format);
-
-  if (ctx.originalAttachmentFileName === DUMMY_PATH) {
-    return DUMMY_PATH;
-  }
-
-  const promptResult = await promptWithPreview({
-    ctx,
-    valueValidator: (value) =>
-      validatePath({
-        app: ctx.app,
-        areTokensAllowed: false,
-        path: value
-      })
-  });
-  if (promptResult === null) {
-    throw new Error('Prompt cancelled');
-  }
-  return formatString(promptResult, ctx.format);
 }
 
 export class Substitutions {
@@ -286,9 +292,11 @@ export class Substitutions {
   }
 
   public readonly noteFolderPath: string;
+
+  private readonly actionContext: ActionContext;
   private readonly app: App;
   private readonly attachmentFileContent: ArrayBuffer | undefined;
-  private readonly attachmentFileStat: Stat | undefined;
+  private readonly attachmentFileStat: FileStats | undefined;
   private readonly cursorLine: null | number;
   private readonly generatedAttachmentFileName: string;
   private readonly generatedAttachmentFilePath: string;
@@ -296,16 +304,28 @@ export class Substitutions {
   private readonly noteFileName: string;
   private readonly noteFilePath: string;
   private readonly noteFolderName: string;
+  private readonly oldNoteFileName: string;
+  private readonly oldNoteFilePath: string;
+  private readonly oldNoteFolderName: string;
+  private readonly oldNoteFolderPath: string;
   private readonly originalAttachmentFileExtension: string;
   private readonly originalAttachmentFileName: string;
+  private readonly plugin: Plugin;
 
   public constructor(options: SubstitutionsOptions) {
-    this.app = options.app;
+    this.plugin = options.plugin;
+    this.app = options.plugin.app;
+    this.actionContext = options.actionContext;
 
     this.noteFilePath = options.noteFilePath;
     this.noteFileName = basename(this.noteFilePath, extname(this.noteFilePath));
-    this.noteFolderName = basename(dirname(this.noteFilePath));
-    this.noteFolderPath = dirname(this.noteFilePath);
+    this.noteFolderName = dotToEmpty(basename(dirname(this.noteFilePath)));
+    this.noteFolderPath = dotToEmpty(dirname(this.noteFilePath));
+
+    this.oldNoteFilePath = options.oldNoteFilePath ?? '';
+    this.oldNoteFileName = basename(this.oldNoteFilePath, extname(this.oldNoteFilePath));
+    this.oldNoteFolderName = dotToEmpty(basename(dirname(this.oldNoteFilePath)));
+    this.oldNoteFolderPath = dotToEmpty(dirname(this.oldNoteFilePath));
 
     const originalAttachmentFileName = options.originalAttachmentFileName ?? '';
     const originalAttachmentFileExtension = extname(originalAttachmentFileName);
@@ -318,13 +338,17 @@ export class Substitutions {
     this.generatedAttachmentFileName = options.generatedAttachmentFileName ?? '';
     this.generatedAttachmentFilePath = options.generatedAttachmentFilePath ?? '';
 
-    this.cursorLine = null;
+    if (options.cursorLine === undefined) {
+      this.cursorLine = null;
 
-    if (this.app.workspace.activeEditor?.file?.path === this.noteFilePath) {
-      const cursor = this.app.workspace.activeEditor.editor?.getCursor();
-      if (cursor) {
-        this.cursorLine = cursor.line;
+      if (this.app.workspace.activeEditor?.file?.path === this.noteFilePath) {
+        const cursor = this.app.workspace.activeEditor.editor?.getCursor();
+        if (cursor) {
+          this.cursorLine = cursor.line;
+        }
       }
+    } else {
+      this.cursorLine = options.cursorLine;
     }
   }
 
@@ -345,11 +369,11 @@ export class Substitutions {
     );
     this.registerToken(
       'originalAttachmentFileCreationDate',
-      (ctx) => ctx.attachmentFileStat?.ctime ? moment(ctx.attachmentFileStat.ctime).format(ctx.format) : ''
+      (ctx) => formatAttachmentFileDate(ctx.attachmentFileStat?.ctime, ctx.format)
     );
     this.registerToken(
       'originalAttachmentFileModificationDate',
-      (ctx) => ctx.attachmentFileStat?.mtime ? moment(ctx.attachmentFileStat.mtime).format(ctx.format) : ''
+      (ctx) => formatAttachmentFileDate(ctx.attachmentFileStat?.mtime, ctx.format)
     );
 
     this.registerToken('noteFileName', (ctx) => formatString(ctx.noteFileName, ctx.format));
@@ -362,7 +386,7 @@ export class Substitutions {
     this.registerToken('originalAttachmentFileExtension', (ctx) => ctx.originalAttachmentFileExtension);
     this.registerToken('originalAttachmentFileName', (ctx) => formatString(ctx.originalAttachmentFileName, ctx.format));
 
-    this.registerToken('prompt', (ctx) => prompt(ctx));
+    this.registerToken('prompt', (ctx, substitutions) => substitutions.prompt(ctx));
 
     this.registerToken('random', (ctx) => generateRandomValue(ctx.format));
 
@@ -396,6 +420,7 @@ export class Substitutions {
 
       const ctx: TokenEvaluatorContext = {
         abortSignal,
+        actionContext: this.actionContext,
         app: this.app,
         attachmentFileContent: this.attachmentFileContent,
         attachmentFileStat: this.attachmentFileStat,
@@ -409,6 +434,10 @@ export class Substitutions {
         noteFolderName: this.noteFolderName,
         noteFolderPath: this.noteFolderPath,
         obsidian,
+        oldNoteFileName: this.oldNoteFileName,
+        oldNoteFilePath: this.oldNoteFilePath,
+        oldNoteFolderName: this.oldNoteFolderName,
+        oldNoteFolderPath: this.oldNoteFolderPath,
         originalAttachmentFileExtension: this.originalAttachmentFileExtension,
         originalAttachmentFileName: this.originalAttachmentFileName,
         token,
@@ -435,6 +464,29 @@ export class Substitutions {
     });
   }
 
+  public async prompt(ctx: TokenEvaluatorContext): Promise<string> {
+    // Validate format
+    formatString('', ctx.format);
+
+    if (ctx.actionContext === ActionContext.ValidateTokens || ctx.originalAttachmentFileName === DUMMY_PATH) {
+      return DUMMY_PATH;
+    }
+
+    const promptResult = await promptWithPreview({
+      ctx,
+      valueValidator: (value) =>
+        validatePath({
+          areTokensAllowed: false,
+          path: value,
+          plugin: this.plugin
+        })
+    });
+    if (promptResult === null) {
+      throw new Error('Prompt cancelled');
+    }
+    return formatString(promptResult, ctx.format);
+  }
+
   private async getHeading(format: string): Promise<string> {
     format ||= 'any';
     if (!(HEADING_LEVELS as readonly string[]).includes(format)) {
@@ -442,7 +494,8 @@ export class Substitutions {
     }
 
     const headingsInfo = await this.initHeadings();
-    return headingsInfo.get(format as HeadingLevel) ?? '';
+    const rawHeading = headingsInfo.get(format as HeadingLevel) ?? '';
+    return this.plugin.replaceSpecialCharacters(rawHeading);
   }
 
   private async initHeadings(): Promise<Map<HeadingLevel, string>> {
@@ -501,7 +554,7 @@ export async function validateFileName(options: ValidateFileNameOptions): Promis
     case TokenValidationMode.Skip:
       break;
     case TokenValidationMode.Validate: {
-      const validationMessage = await validateTokens(options.app, options.fileName);
+      const validationMessage = await validateTokens(options.plugin, options.fileName);
       if (validationMessage) {
         return validationMessage;
       }
@@ -538,7 +591,7 @@ export async function validateFileName(options: ValidateFileNameOptions): Promis
 
 export async function validatePath(options: ValidatePathOptions): Promise<string> {
   if (options.areTokensAllowed) {
-    const unknownToken = await validateTokens(options.app, options.path);
+    const unknownToken = await validateTokens(options.plugin, options.path);
     if (unknownToken) {
       return `Unknown token: ${unknownToken}`;
     }
@@ -559,10 +612,10 @@ export async function validatePath(options: ValidatePathOptions): Promise<string
   const pathParts = path.split('/');
   for (const part of pathParts) {
     const partValidationError = await validateFileName({
-      app: options.app,
       areSingleDotsAllowed: true,
       fileName: part,
       isEmptyAllowed: true,
+      plugin: options.plugin,
       tokenValidationMode: TokenValidationMode.Skip
     });
 
@@ -572,6 +625,10 @@ export async function validatePath(options: ValidatePathOptions): Promise<string
   }
 
   return '';
+}
+
+function dotToEmpty(name: string): string {
+  return name === '.' ? '' : name;
 }
 
 function extractTokens(str: string): Token[] {
@@ -612,11 +669,12 @@ function slugifyEx(str: string): string {
   });
 }
 
-async function validateTokens(app: App, str: string): Promise<null | string> {
+async function validateTokens(plugin: Plugin, str: string): Promise<null | string> {
   const FAKE_SUBSTITUTION = new Substitutions({
-    app,
+    actionContext: ActionContext.ValidateTokens,
     noteFilePath: DUMMY_PATH,
-    originalAttachmentFileName: DUMMY_PATH
+    originalAttachmentFileName: DUMMY_PATH,
+    plugin
   });
 
   const tokens = extractTokens(str);

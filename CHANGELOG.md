@@ -1,8 +1,211 @@
 # CHANGELOG
 
-## 9.8.1-beta.1
+## 9.17.11
 
-- Merge tag 'tags/9.8.0' into develop 9.8.0
+- chore: update libs
+
+## 9.17.10
+
+- chore: update libs
+  - fix #231
+
+## 9.17.9
+
+- chore: update libs
+
+## 9.17.8
+
+- fix: preserve settings cursor position
+
+## 9.17.7
+
+- fix: proper space replacement
+
+## 9.17.6
+
+- fix: properly handle unicode chars
+  - fix #229
+
+## 9.17.5
+
+- fix: properly resolve empty folders
+
+## 9.17.4
+
+- fix: init cursor line to extract headings
+  - fix: #228
+- chore: update libs
+- chore: enable markdownlint
+
+## 9.17.3
+
+- chore: update libs
+
+## 9.17.2
+
+- fix: build
+- chore: update libs
+
+## 9.17.1
+
+- chore: enable conventional commits
+
+## 9.17.0
+
+- Add default image size (#224)
+
+## 9.16.5
+
+- Update libs (#223)
+
+## 9.16.4
+
+- Update libs (#222)
+
+## 9.16.3
+
+- Simplify AttachmentCollector as links already handled by Rename handler (#221)
+- Ensure MetadataDeleted processed before queue (#220)
+
+## 9.16.2
+
+- Don't hide Notice until done
+- Collect each attachment once (#219)
+
+## 9.16.1
+
+- Update libs (#217)
+- Improve default placeholders
+
+## 9.16.0
+
+- Add all translations
+- Validate plugin version
+- Warn about special characters change
+- Add missing i18n
+- Replace special characters in headings
+- Don't mix empty and default setting UI
+
+## 9.15.8
+
+- Ensure frontmatter links headings are not used
+
+## 9.15.7
+
+- Substitute headings on collect (#214)
+
+## 9.15.6
+
+- Clarify term `pasted image` (#215)
+
+## 9.15.5
+
+- Fix enum binding (#213)
+
+## 9.15.4
+
+- Minor changes
+
+## 9.15.3
+
+- Fix infinite rename (#211)
+
+## 9.15.2
+
+- Additional check for dummy path (#210)
+
+## 9.15.1
+
+- Fix root folder
+
+## 9.15.0
+
+- Add oldNoteFile\* tokens
+
+## 9.14.0
+
+- Pass ActionContext
+
+## 9.13.5
+
+- Minor changes
+
+## 9.13.4
+
+- Minor changes
+
+## 9.13.3
+
+- Reuse base i18n
+
+## 9.13.2
+
+- Rename back
+
+## 9.13.1
+
+- Localize unhandledError
+
+## 9.13.0
+
+- Add Chinese translation (#201)
+
+## 9.12.0
+
+- Fix paths with trailing spaces and dots (#204)
+
+## 9.11.1
+
+- #206
+
+## 9.11.0
+
+- Add timeout setting (#203)
+
+## 9.10.6
+
+- Minor changes
+
+## 9.10.5
+
+- Fix uninitialized stats on rename
+- Fix #202
+
+## 9.10.4
+
+- More accurate file changes
+
+## 9.10.3
+
+- Minor changes
+
+## 9.10.2
+
+- Register patch without using temp files (#199)
+
+## 9.10.1
+
+- Fix closing active note on load
+  - fix: <https://github.com/RainCat1998/obsidian-custom-attachment-location/issues/199#issuecomment-3241586013>
+
+## 9.10.0
+
+- Add default=empty, default=now
+
+## 9.9.1
+
+- Truncate time
+
+## 9.9.0
+
+- Don't add extra new lines (#196)
+- Improve description
+- Pass content and stats to every substitutions
+- Copy original times when creating attachments
+
+## 9.8.1
+
+- Minor changes
 
 ## 9.8.0
 
@@ -771,25 +974,25 @@
 
 ## 1.0.0
 
-- Fix README.md template example to prevent inappropriate latex rendering by @kaiiiz in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/28
-- Handle pasting multiple images by @mnaoumov in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/58
-- Support date var template(moment.js) in folder path & image name by @Harrd in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/56
-- Add mobile support by @mengbo in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/44
-- Add name sanitization when creating folder. by @EricWiener in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/35
-- Feature: Compress images from png to jpeg while pasting from the clipboard by @kaiiiz in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/29
+- Fix README.md template example to prevent inappropriate latex rendering by @kaiiiz in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/28>
+- Handle pasting multiple images by @mnaoumov in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/58>
+- Support date var template(moment.js) in folder path & image name by @Harrd in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/56>
+- Add mobile support by @mengbo in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/44>
+- Add name sanitization when creating folder. by @EricWiener in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/35>
+- Feature: Compress images from png to jpeg while pasting from the clipboard by @kaiiiz in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/29>
 
 ## 0.0.9
 
-- Update attachment folder config when note renamed by @mnaoumov in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/26
+- Update attachment folder config when note renamed by @mnaoumov in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/26>
 
 ## 0.0.8
 
-- Move attachments when note is moved by @mnaoumov in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/21
-- Make attachment folder setting modified every time file opens by @mnaoumov in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/23
+- Move attachments when note is moved by @mnaoumov in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/21>
+- Make attachment folder setting modified every time file opens by @mnaoumov in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/23>
 
 ## 0.0.7
 
-- Fixed minor typo in the settings by @astrodad in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/10
+- Fixed minor typo in the settings by @astrodad in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/10>
 - Temporarily fix Drag-n-Drop file from explorer doesn't copy file to obsidian vault.
 
 ## 0.0.6
@@ -800,7 +1003,7 @@
 ## 0.0.5
 
 - Add support for drop event
-- Fix typos & grammar by @TypicalHog in https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/2
+- Fix typos & grammar by @TypicalHog in <https://github.com/RainCat1998/obsidian-custom-attachment-location/pull/2>
 
 ## 0.0.4
 
