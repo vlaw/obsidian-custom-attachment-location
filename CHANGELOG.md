@@ -285,14 +285,8 @@
 ## 9.0.5
 
 - removeUndefinedProperties (#186, #188)
-  <<<<<<< HEAD
 - Refactor abortSignal (#186, #188)
 - Update libs
-  ||||||| e2a310f
-- Refactor abortSignal (#186, #188)
-- # Update libs
-- Refactor abortSignal (#186, #188)
-  > > > > > > > tags/9.8.0
 
 ## 9.0.4
 
