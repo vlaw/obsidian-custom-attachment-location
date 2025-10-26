@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 9.17.12-beta.1
+
+- Merge tag 'tags/9.17.11' into develop 9.17.11
+
 ## 9.17.11
 
 - chore: update libs
