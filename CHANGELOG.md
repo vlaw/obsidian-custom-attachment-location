@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 9.17.15-beta.1
+
+- chore(linkinator): update skip
+- chore(package-lock): npm install ts-md5
+- feat: md5
+
 ## 9.17.14
 
 - fix: handling include/exclude paths not ending with /
