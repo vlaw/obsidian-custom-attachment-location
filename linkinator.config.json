@@ -1,0 +1,6 @@
+{
+  "skip": [
+    "www.googleapis.com",
+    "github.com"
+  ]
+}
