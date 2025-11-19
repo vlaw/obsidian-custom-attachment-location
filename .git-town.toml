@@ -1,0 +1,21 @@
+# More info around this file at https://www.git-town.com/configuration-file
+
+[branches]
+main = "master"
+
+[create]
+new-branch-type = "feature"
+
+[hosting]
+dev-remote = "origin"
+
+[ship]
+delete-tracking-branch = true
+
+[sync]
+feature-strategy = "merge"
+perennial-strategy = "ff-only"
+prototype-strategy = "merge"
+push-hook = true
+tags = true
+upstream = true
