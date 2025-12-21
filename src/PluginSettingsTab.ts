@@ -24,12 +24,14 @@ import {
   AttachmentRenameMode,
   CollectAttachmentUsedByMultipleNotesMode,
   DefaultImageSizeDimension,
+  MoveAttachmentToProperFolderUsedByMultipleNotesMode,
   SAMPLE_CUSTOM_TOKENS
 } from './PluginSettings.ts';
 import { TOKENIZED_STRING_LANGUAGE } from './PrismComponent.ts';
 import { Substitutions } from './Substitutions.ts';
 
 const VISIBLE_SPACE_CHARACTER = '␣';
+const JPEG_QUALITY_PRECISION = 2;
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   public override display(): void {
@@ -146,17 +148,66 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
 
     new SettingEx(this.containerEl)
+      .setName(t(($) => $.pluginSettingsTab.shouldHandleRenames.name))
+      .setDesc(t(($) => $.pluginSettingsTab.shouldHandleRenames.description))
+      .addToggle((toggle) => {
+        this.bind(toggle, 'shouldHandleRenames', {
+          onChanged: () => {
+            this.display();
+          }
+        });
+      });
+
+    new SettingEx(this.containerEl)
       .setName(t(($) => $.pluginSettingsTab.shouldRenameAttachmentFolders.name))
       .setDesc(t(($) => $.pluginSettingsTab.shouldRenameAttachmentFolders.description))
       .addToggle((toggle) => {
-        this.bind(toggle, 'shouldRenameAttachmentFolder');
+        if (this.plugin.settings.shouldHandleRenames) {
+          this.bind(toggle, 'shouldRenameAttachmentFolder');
+        } else {
+          toggle.setDisabled(true);
+          toggle.setValue(false);
+        }
       });
 
     new SettingEx(this.containerEl)
       .setName(t(($) => $.pluginSettingsTab.shouldRenameAttachmentFiles.name))
-      .setDesc(t(($) => $.pluginSettingsTab.shouldRenameAttachmentFiles.description))
+      .setDesc(createFragment((f) => {
+        f.appendText(t(($) => $.pluginSettingsTab.shouldRenameAttachmentFiles.description.part1));
+        f.appendText(' ');
+        appendCodeBlock(f, t(($) => $.pluginSettingsTab.renamedAttachmentFileName.name));
+        f.appendText(' ');
+        f.appendText(t(($) => $.pluginSettingsTab.shouldRenameAttachmentFiles.description.part2));
+      }))
       .addToggle((toggle) => {
-        this.bind(toggle, 'shouldRenameAttachmentFiles');
+        if (this.plugin.settings.shouldHandleRenames) {
+          this.bind(toggle, 'shouldRenameAttachmentFiles');
+        } else {
+          toggle.setDisabled(true);
+          toggle.setValue(false);
+        }
+      });
+
+    new SettingEx(this.containerEl)
+      .setName(t(($) => $.pluginSettingsTab.renamedAttachmentFileName.name))
+      .setDesc(createFragment((f) => {
+        f.appendText(t(($) => $.pluginSettingsTab.renamedAttachmentFileName.description.part1));
+        f.appendText(' ');
+        f.createEl('a', {
+          href: 'https://github.com/RainCat1998/obsidian-custom-attachment-location?tab=readme-ov-file#tokens',
+          text: t(($) => $.pluginSettingsTab.renamedAttachmentFileName.description.part2)
+        });
+        f.appendText('.');
+        f.createEl('br');
+        f.appendText(t(($) => $.pluginSettingsTab.renamedAttachmentFileName.description.part3));
+        f.appendText(' ');
+        appendCodeBlock(f, t(($) => $.pluginSettingsTab.generatedAttachmentFileName.name));
+        f.appendText(t(($) => $.pluginSettingsTab.renamedAttachmentFileName.description.part4));
+      }))
+      .addCodeHighlighter((codeHighlighter) => {
+        codeHighlighter.setLanguage(TOKENIZED_STRING_LANGUAGE);
+        codeHighlighter.inputEl.addClass('tokenized-string-setting-control');
+        this.bind(codeHighlighter, 'renamedAttachmentFileName', bindOptionsWithTrim);
       });
 
     new SettingEx(this.containerEl)
@@ -205,7 +256,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         dropDown.addOptions(generateJpegQualityOptions());
         this.bind(dropDown, 'jpegQuality', {
           componentToPluginSettingsValueConverter: (value) => Number(value),
-          pluginSettingsToComponentValueConverter: (value) => value.toString()
+          pluginSettingsToComponentValueConverter: (value) => value.toPrecision(JPEG_QUALITY_PRECISION)
         });
       });
 
@@ -218,12 +269,34 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         f.appendText(' ');
         f.appendText(t(($) => $.pluginSettingsTab.shouldRenameCollectedAttachments.description.part3));
         f.appendText(' ');
-        appendCodeBlock(f, t(($) => $.pluginSettingsTab.generatedAttachmentFileName.name));
+        appendCodeBlock(f, t(($) => $.pluginSettingsTab.collectedAttachmentFileName.name));
         f.appendText(' ');
         f.appendText(t(($) => $.pluginSettingsTab.shouldRenameCollectedAttachments.description.part4));
       }))
       .addToggle((toggle) => {
         this.bind(toggle, 'shouldRenameCollectedAttachments');
+      });
+
+    new SettingEx(this.containerEl)
+      .setName(t(($) => $.pluginSettingsTab.collectedAttachmentFileName.name))
+      .setDesc(createFragment((f) => {
+        f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFileName.description.part1));
+        f.appendText(' ');
+        f.createEl('a', {
+          href: 'https://github.com/RainCat1998/obsidian-custom-attachment-location?tab=readme-ov-file#tokens',
+          text: t(($) => $.pluginSettingsTab.collectedAttachmentFileName.description.part2)
+        });
+        f.appendText('.');
+        f.createEl('br');
+        f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFileName.description.part3));
+        f.appendText(' ');
+        appendCodeBlock(f, t(($) => $.pluginSettingsTab.generatedAttachmentFileName.name));
+        f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFileName.description.part4));
+      }))
+      .addCodeHighlighter((codeHighlighter) => {
+        codeHighlighter.setLanguage(TOKENIZED_STRING_LANGUAGE);
+        codeHighlighter.inputEl.addClass('tokenized-string-setting-control');
+        this.bind(codeHighlighter, 'collectedAttachmentFileName', bindOptionsWithTrim);
       });
 
     new SettingEx(this.containerEl)
@@ -262,6 +335,47 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           /* eslint-enable perfectionist/sort-objects -- Need to keep enum order. */
         });
         this.bind(dropdown, 'collectAttachmentUsedByMultipleNotesMode');
+      });
+
+    new SettingEx(this.containerEl)
+      .setName(t(($) => $.pluginSettingsTab.moveAttachmentToProperFolderUsedByMultipleNotesMode.name))
+      .setDesc(createFragment((f) => {
+        f.appendText(t(($) => $.pluginSettingsTab.moveAttachmentToProperFolderUsedByMultipleNotesMode.description.part1));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.skip.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.skip.description));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.copyAll.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.copyAll.description));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.cancel.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.cancel.description));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.prompt.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.prompt.description));
+      }))
+      .addDropdown((dropdown) => {
+        dropdown.addOptions({
+          /* eslint-disable perfectionist/sort-objects -- Need to keep enum order. */
+          [MoveAttachmentToProperFolderUsedByMultipleNotesMode.Skip]: t(($) =>
+            $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.skip.displayText
+          ),
+          [MoveAttachmentToProperFolderUsedByMultipleNotesMode.CopyAll]: t(($) =>
+            $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.copyAll.displayText
+          ),
+          [MoveAttachmentToProperFolderUsedByMultipleNotesMode.Cancel]: t(($) =>
+            $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.cancel.displayText
+          ),
+          [MoveAttachmentToProperFolderUsedByMultipleNotesMode.Prompt]: t(($) =>
+            $.pluginSettings.moveAttachmentToProperFolderUsedByMultipleNotesMode.prompt.displayText
+          )
+          /* eslint-enable perfectionist/sort-objects -- Need to keep enum order. */
+        });
+        this.bind(dropdown, 'moveAttachmentToProperFolderUsedByMultipleNotesMode');
       });
 
     new SettingEx(this.containerEl)
@@ -469,6 +583,8 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         f.appendText(', ');
         appendCodeBlock(f, '.baz.base');
         f.appendText(t(($) => $.pluginSettingsTab.treatAsAttachmentExtensions.description.part6));
+        f.createEl('br');
+        f.appendText(t(($) => $.pluginSettingsTab.treatAsAttachmentExtensions.description.part7));
       }))
       .addMultipleText((multipleText) => {
         this.bind(multipleText, 'treatAsAttachmentExtensions');
@@ -528,10 +644,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 }
 
 function generateJpegQualityOptions(): Record<string, string> {
-  const MAX_QUALITY = 10;
+  const MAX_QUALITY = 20;
   const ans: Record<string, string> = {};
   for (let i = 1; i <= MAX_QUALITY; i++) {
-    const valueStr = (i / MAX_QUALITY).toFixed(1);
+    const valueStr = (i / MAX_QUALITY).toFixed(JPEG_QUALITY_PRECISION);
     ans[valueStr] = valueStr;
   }
 

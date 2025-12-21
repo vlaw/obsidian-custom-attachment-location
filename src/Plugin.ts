@@ -24,21 +24,20 @@ import type {
 } from 'obsidian-typings/implementations';
 
 import { webUtils } from 'electron';
-import moment from 'moment';
 import {
   CapacitorAdapter,
   FileSystemAdapter,
   MarkdownView,
   Menu,
   MenuItem,
-  TAbstractFile,
+  moment as moment_,
   TFile,
-  TFolder,
   Vault
 } from 'obsidian';
 import { convertAsyncToSync } from 'obsidian-dev-utils/Async';
 import { blobToJpegArrayBuffer } from 'obsidian-dev-utils/Blob';
 import {
+  extractDefaultExportInterop,
   getPrototypeOf,
   normalizeOptionalProperties,
   removeUndefinedProperties
@@ -50,9 +49,9 @@ import {
 import {
   getAbstractFileOrNull,
   getFileOrNull,
-  getPath
+  getPath,
+  isNote
 } from 'obsidian-dev-utils/obsidian/FileSystem';
-import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import {
   encodeUrl,
   extractLinkFile,
@@ -88,17 +87,15 @@ import {
 
 import type { PluginTypes } from './PluginTypes.ts';
 
-import {
-  collectAttachmentsCurrentFolder,
-  collectAttachmentsCurrentNote,
-  collectAttachmentsEntireVault,
-  collectAttachmentsInFolder,
-  isNoteEx
-} from './AttachmentCollector.ts';
+import { isNoteEx } from './AttachmentCollector.ts';
 import {
   getAttachmentFolderFullPathForPath,
   getGeneratedAttachmentFileBaseName
 } from './AttachmentPath.ts';
+import { CollectAttachmentsEntireVaultCommand } from './Commands/CollectAttachmentsEntireVaultCommand.ts';
+import { CollectAttachmentsInCurrentFolderCommand } from './Commands/CollectAttachmentsInCurrentFolderCommand.ts';
+import { CollectAttachmentsInFileCommand } from './Commands/CollectAttachmentsInFileCommand.ts';
+import { MoveAttachmentToProperFolderCommand } from './Commands/MoveAttachmentToProperFolderCommand.ts';
 import { translationsMap } from './i18n/locales/translationsMap.ts';
 import { getImageSize } from './Image.ts';
 import { AttachmentRenameMode } from './PluginSettings.ts';
@@ -107,6 +104,8 @@ import { PluginSettingsTab } from './PluginSettingsTab.ts';
 import { PrismComponent } from './PrismComponent.ts';
 import { Substitutions } from './Substitutions.ts';
 import { ActionContext } from './TokenEvaluatorContext.ts';
+
+const moment = extractDefaultExportInterop(moment_);
 
 type ArrayBufferFn = File['arrayBuffer'];
 interface FileEx {
@@ -227,7 +226,7 @@ export class Plugin extends PluginBase<PluginTypes> {
         isNote: (path) => isNoteEx(this, path),
         isPathIgnored: (path) => this.settings.isPathIgnored(path),
         shouldHandleDeletions: this.settings.shouldDeleteOrphanAttachments,
-        shouldHandleRenames: true,
+        shouldHandleRenames: this.settings.shouldHandleRenames,
         shouldRenameAttachmentFiles: this.settings.shouldRenameAttachmentFiles,
         shouldRenameAttachmentFolder: this.settings.shouldRenameAttachmentFolder,
         shouldUpdateFileNameAliases: true
@@ -235,27 +234,10 @@ export class Plugin extends PluginBase<PluginTypes> {
       return settings;
     });
 
-    this.addCommand({
-      checkCallback: (checking) => collectAttachmentsCurrentNote(this, checking),
-      id: 'collect-attachments-current-note',
-      name: t(($) => $.commands.collectAttachmentsCurrentNote)
-    });
-
-    this.addCommand({
-      checkCallback: (checking) => collectAttachmentsCurrentFolder(this, checking),
-      id: 'collect-attachments-current-folder',
-      name: t(($) => $.commands.collectAttachmentsCurrentFolder)
-    });
-
-    this.addCommand({
-      callback: () => {
-        collectAttachmentsEntireVault(this);
-      },
-      id: 'collect-attachments-entire-vault',
-      name: t(($) => $.commands.collectAttachmentsEntireVault)
-    });
-
-    this.registerEvent(this.app.workspace.on('file-menu', this.handleFileMenu.bind(this)));
+    new CollectAttachmentsInFileCommand(this).register();
+    new CollectAttachmentsInCurrentFolderCommand(this).register();
+    new CollectAttachmentsEntireVaultCommand(this).register();
+    new MoveAttachmentToProperFolderCommand(this).register();
 
     registerPatch(this, this.app, {
       saveAttachment: (): SaveAttachmentFn => {
@@ -382,7 +364,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     let attachmentPath: string;
-    if (!noteFilePath || !isNoteEx(this, noteFilePath)) {
+    if (!noteFilePath || !isNote(this.app, noteFilePath)) {
       attachmentPath = await getAvailablePathForAttachments({
         app: this.app,
         attachmentFileBaseName,
@@ -407,6 +389,7 @@ export class Plugin extends PluginBase<PluginTypes> {
         generatedAttachmentFileName = attachmentFileName;
       } else {
         const cursorLine = await this.getCursorLine(noteFilePath, options.oldAttachmentPathOrFile);
+        const sequenceNumber = await this.getSequenceNumber(noteFilePath, options.oldAttachmentPathOrFile);
         const generatedAttachmentFileBaseName = await getGeneratedAttachmentFileBaseName(
           this,
           new Substitutions({
@@ -417,7 +400,8 @@ export class Plugin extends PluginBase<PluginTypes> {
             noteFilePath,
             oldNoteFilePath,
             originalAttachmentFileName: attachmentFileName,
-            plugin: this
+            plugin: this,
+            sequenceNumber
           })
         );
         generatedAttachmentFileName = makeFileName(generatedAttachmentFileBaseName, attachmentFileExtension);
@@ -490,6 +474,34 @@ export class Plugin extends PluginBase<PluginTypes> {
     return next(file);
   }
 
+  private async getSequenceNumber(noteFilePath: string, oldAttachmentPathOrFile: PathOrFile): Promise<number> {
+    const oldAttachmentFile = getFileOrNull(this.app, oldAttachmentPathOrFile);
+    if (!oldAttachmentFile) {
+      return 0;
+    }
+
+    const cache = await getCacheSafe(this.app, noteFilePath);
+    if (!cache) {
+      return 0;
+    }
+
+    let sequenceNumber = 1;
+    for (const link of getAllLinks(cache)) {
+      const linkFile = extractLinkFile(this.app, link, noteFilePath);
+      if (!linkFile) {
+        continue;
+      }
+
+      if (linkFile === oldAttachmentFile) {
+        return sequenceNumber;
+      }
+
+      sequenceNumber++;
+    }
+
+    return 0;
+  }
+
   private async handleActiveLeafChange(leaf: null | WorkspaceLeaf): Promise<void> {
     if (this.isMarkdownViewPatched) {
       return;
@@ -517,18 +529,6 @@ export class Plugin extends PluginBase<PluginTypes> {
     });
 
     this.isMarkdownViewPatched = true;
-  }
-
-  private handleFileMenu(menu: Menu, file: TAbstractFile): void {
-    if (!(file instanceof TFolder)) {
-      return;
-    }
-
-    menu.addItem((item) => {
-      item.setTitle(t(($) => $.menuItems.collectAttachmentsInFolder))
-        .setIcon('download')
-        .onClick(() => collectAttachmentsInFolder(this, file, this.abortSignal));
-    });
   }
 
   private async handleFileOpen(file: null | TFile): Promise<void> {
@@ -603,6 +603,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   private async importFiles(next: ImportFilesFn, files: SharedFile[]): Promise<void> {
     for (const file of files) {
       const fileUri = window.Capacitor.convertFileSrc(file.uri);
+      // eslint-disable-next-line no-restricted-globals -- `requestUrl()` doesn't work for those Capacitor urls.
       const response = await fetch(fileUri);
       const attachmentFileContent = await response.arrayBuffer();
       const substitutions = new Substitutions({

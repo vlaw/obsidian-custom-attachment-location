@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const tr: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Klasördeki tüm notlar için ekleri toplamak istiyor musunuz:',
-      part2: 've tüm alt klasörlerinde?',
-      part3: 'Bu işlem geri alınamaz.'
+      part1: 'Klasörlerdeki tüm notlar için ekleri yinelemeli olarak toplamak ister misiniz?',
+      part2: 'Bu işlem geri alınamaz.'
     },
     progressBar: {
       message: 'Ekler toplanıyor {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const tr: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Tüm kasadaki ekleri topla'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Klasördeki ekleri topla'
+    collectAttachmentsInFile: 'Dosyada ekleri topla',
+    collectAttachmentsInFiles: 'Dosyalarda ekleri topla'
   },
   notice: {
     collectingAttachments: '\'{{noteFilePath}}\' için ekler toplanıyor',
@@ -172,6 +172,13 @@ export const tr: Translations<PluginTypes> = {
       },
       name: 'Birden fazla notta kullanılan ek toplama modu'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Mevcut',
+        part2: 'tokenlara bakınız'
+      },
+      name: 'Toplanan ek dosya adı'
+    },
     customTokens: {
       description: {
         part1: 'Kullanılacak özel tokenlar.',
@@ -268,6 +275,13 @@ export const tr: Translations<PluginTypes> = {
       name: 'Markdown URL formatı'
     },
     renameAttachmentsToLowerCase: 'Eklerin dosya adlarını küçük harfe çevir',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Mevcut',
+        part2: 'tokenlara bakınız'
+      },
+      name: 'Yeniden adlandırılan ek dosya adı'
+    },
     resetToSampleCustomTokens: {
       message: 'Özel tokenları örnek tokenlara sıfırlamak istediğinize emin misiniz? Değişiklikleriniz kaybolacak.',
       title: 'Örnek tokenlara sıfırla'
@@ -282,7 +296,10 @@ export const tr: Translations<PluginTypes> = {
       name: 'Yetim ekleri sil'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Bir not yeniden adlandırıldığında veya taşındığında ek dosyaları yeniden adlandırılsın mı?',
+      description: {
+        part1: 'Etkinleştirilirse, bir not yeniden adlandırıldığında veya taşındığında ekleri',
+        part2: 'ayarına göre yeniden adlandırılacaktır.'
+      },
       name: 'Ek dosyalarını yeniden adlandır'
     },
     shouldRenameAttachmentFolders: {

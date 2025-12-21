@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const pt: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Deseja recolher anexos para todas as notas na pasta:',
-      part2: 'e todas as suas subpastas?',
-      part3: 'Esta operação não pode ser desfeita.'
+      part1: 'Você deseja coletar anexos para todas as notas nas pastas de forma recursiva?',
+      part2: 'Esta operação não pode ser desfeita.'
     },
     progressBar: {
       message: 'Recolhendo anexos {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const pt: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Recolher anexos em todo o cofre'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Recolher anexos na pasta'
+    collectAttachmentsInFile: 'Coletar anexos no arquivo',
+    collectAttachmentsInFiles: 'Coletar anexos nos arquivos'
   },
   notice: {
     collectingAttachments: 'Recolhendo anexos para \'{{noteFilePath}}\'',
@@ -174,6 +174,13 @@ export const pt: Translations<PluginTypes> = {
       },
       name: 'Modo de recolha de anexos usados por múltiplas notas'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Veja os',
+        part2: 'tokens disponíveis'
+      },
+      name: 'Nome do ficheiro de anexo recolhido'
+    },
     customTokens: {
       description: {
         part1: 'Tokens personalizados a serem usados.',
@@ -270,6 +277,13 @@ export const pt: Translations<PluginTypes> = {
       name: 'Formato de URL em Markdown'
     },
     renameAttachmentsToLowerCase: 'Renomear anexos para minúsculas',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Veja os',
+        part2: 'tokens disponíveis'
+      },
+      name: 'Nome do ficheiro de anexo renomeado'
+    },
     resetToSampleCustomTokens: {
       message: 'Tem a certeza de que deseja repor os tokens personalizados para os tokens de exemplo? As suas alterações serão perdidas.',
       title: 'Repor tokens personalizados para o exemplo'
@@ -284,7 +298,10 @@ export const pt: Translations<PluginTypes> = {
       name: 'Eliminar anexos órfãos'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Se os ficheiros de anexos devem ser renomeados quando uma nota é renomeada ou movida.',
+      description: {
+        part1: 'Se ativado, quando uma nota é renomeada ou movida, os seus anexos serão renomeados de acordo com a',
+        part2: 'configuração.'
+      },
       name: 'Renomear ficheiros de anexos'
     },
     shouldRenameAttachmentFolders: {

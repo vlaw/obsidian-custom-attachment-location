@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const fr: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Voulez-vous collecter les pièces jointes pour toutes les notes du dossier :',
-      part2: 'et tous ses sous-dossiers ?',
-      part3: 'Cette opération ne peut pas être annulée.'
+      part1: 'Voulez-vous collecter les pièces jointes pour toutes les notes dans les dossiers de manière récursive ?',
+      part2: 'Cette opération ne peut pas être annulée.'
     },
     progressBar: {
       message: 'Collecte des pièces jointes {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const fr: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Collecter les pièces jointes dans tout le coffre'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Collecter les pièces jointes dans le dossier'
+    collectAttachmentsInFile: 'Collecter les pièces jointes dans le fichier',
+    collectAttachmentsInFiles: 'Collecter les pièces jointes dans les fichiers'
   },
   notice: {
     collectingAttachments: 'Collecte des pièces jointes pour \'{{noteFilePath}}\'',
@@ -176,6 +176,15 @@ export const fr: Translations<PluginTypes> = {
       },
       name: 'Mode de collecte de pièce jointe utilisée par plusieurs notes'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Voir les',
+        part2: 'jetons disponibles',
+        part3: 'Laisser vide pour utiliser le paramètre',
+        part4: 'à la place.'
+      },
+      name: 'Nom de fichier de pièce jointe collectée'
+    },
     customTokens: {
       description: {
         part1: 'Jetons personnalisés à utiliser.',
@@ -273,6 +282,15 @@ export const fr: Translations<PluginTypes> = {
       name: 'Format d\'URL Markdown'
     },
     renameAttachmentsToLowerCase: 'Renommer les pièces jointes en minuscules',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Voir les',
+        part2: 'jetons disponibles',
+        part3: 'Laisser vide pour utiliser le paramètre',
+        part4: 'à la place.'
+      },
+      name: 'Nom de fichier de pièce jointe renommée'
+    },
     resetToSampleCustomTokens: {
       message: 'Êtes-vous sûr de vouloir réinitialiser les jetons personnalisés aux jetons personnalisés d\'exemple ? Vos modifications seront perdues.',
       title: 'Réinitialiser aux jetons personnalisés d\'exemple'
@@ -287,7 +305,10 @@ export const fr: Translations<PluginTypes> = {
       name: 'Supprimer les pièces jointes orphelines'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Renommer les fichiers de pièces jointes lorsqu\'une note est renommée ou déplacée.',
+      description: {
+        part1: 'Si activé, lorsqu\'une note est renommée ou déplacée, ses fichiers de pièces jointes seront renommés selon le paramètre',
+        part2: '.'
+      },
       name: 'Renommer les fichiers de pièces jointes'
     },
     shouldRenameAttachmentFolders: {

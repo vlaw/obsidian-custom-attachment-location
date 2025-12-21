@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const nl: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Wil je bijlagen verzamelen voor alle notities in de map:',
-      part2: 'en al zijn submappen?',
-      part3: 'Deze bewerking kan niet ongedaan worden gemaakt.'
+      part1: 'Wil je bijlagen voor alle notities in mappen recursief verzamelen?',
+      part2: 'Deze bewerking kan niet ongedaan worden gemaakt.'
     },
     progressBar: {
       message: 'Bijlagen verzamelen {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const nl: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Bijlagen verzamelen in hele kluis'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Bijlagen verzamelen in map'
+    collectAttachmentsInFile: 'Bijlagen verzamelen in bestand',
+    collectAttachmentsInFiles: 'Bijlagen verzamelen in bestanden'
   },
   notice: {
     collectingAttachments: 'Bijlagen verzamelen voor \'{{noteFilePath}}\'',
@@ -174,6 +174,13 @@ export const nl: Translations<PluginTypes> = {
       },
       name: 'Verzamel bijlage gebruikt door meerdere notities modus'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Zie beschikbare',
+        part2: 'tokens'
+      },
+      name: 'Verzamelde bijlage bestandsnaam'
+    },
     customTokens: {
       description: {
         part1: 'Aangepaste tokens om te gebruiken.',
@@ -271,6 +278,13 @@ export const nl: Translations<PluginTypes> = {
       name: 'Markdown URL formaat'
     },
     renameAttachmentsToLowerCase: 'Hernoem bijlagen naar kleine letters',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Zie beschikbare',
+        part2: 'tokens'
+      },
+      name: 'Hernoemde bijlage bestandsnaam'
+    },
     resetToSampleCustomTokens: {
       message: 'Weet je zeker dat je de aangepaste tokens wilt resetten naar de voorbeeld aangepaste tokens? Je wijzigingen gaan verloren.',
       title: 'Reset naar voorbeeld aangepaste tokens'
@@ -285,7 +299,10 @@ export const nl: Translations<PluginTypes> = {
       name: 'Moet wees bijlagen verwijderen'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Of bijlage bestanden moeten worden hernoemd wanneer een notitie wordt hernoemd of verplaatst.',
+      description: {
+        part1: 'Indien ingeschakeld, wanneer een notitie wordt hernoemd of verplaatst, worden de bijlagen hernoemd volgens de',
+        part2: 'instelling.'
+      },
       name: 'Moet bijlage bestanden hernoemen'
     },
     shouldRenameAttachmentFolders: {

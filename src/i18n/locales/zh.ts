@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const zh: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: '是否要为文件夹中的所有笔记收集附件：',
-      part2: '以及其所有子文件夹？',
-      part3: '此操作无法撤销。'
+      part1: '是否要递归收集文件夹中所有笔记的附件？',
+      part2: '此操作无法撤销。'
     },
     progressBar: {
       message: '正在收集附件 {{iterationStr}} - \'{{noteFilePath}}\'。',
@@ -34,7 +33,8 @@ export const zh: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: '收集整个库中的附件'
   },
   menuItems: {
-    collectAttachmentsInFolder: '收集文件夹中的附件'
+    collectAttachmentsInFile: '在文件中收集附件',
+    collectAttachmentsInFiles: '在多个文件中收集附件'
   },
   notice: {
     collectingAttachments: '正在为 \'{{noteFilePath}}\' 收集附件',
@@ -172,6 +172,13 @@ export const zh: Translations<PluginTypes> = {
       },
       name: '收集被多个笔记使用的附件模式'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: '查看可用',
+        part2: '令牌'
+      },
+      name: '收集的附件文件名'
+    },
     customTokens: {
       description: {
         part1: '要使用的自定义令牌。',
@@ -268,6 +275,13 @@ export const zh: Translations<PluginTypes> = {
       name: 'Markdown URL 格式'
     },
     renameAttachmentsToLowerCase: '将附件重命名为小写',
+    renamedAttachmentFileName: {
+      description: {
+        part1: '查看可用',
+        part2: '令牌'
+      },
+      name: '重命名的附件文件名'
+    },
     resetToSampleCustomTokens: {
       message: '确定要将自定义令牌重置为示例自定义令牌吗？你的更改将会丢失。',
       title: '重置为示例自定义令牌'
@@ -281,7 +295,10 @@ export const zh: Translations<PluginTypes> = {
       name: '是否删除孤立附件'
     },
     shouldRenameAttachmentFiles: {
-      description: '当笔记被重命名或移动时，是否重命名附件文件。',
+      description: {
+        part1: '如果启用，当笔记被重命名或移动时，其附件将根据',
+        part2: '设置进行重命名。'
+      },
       name: '是否重命名附件文件'
     },
     shouldRenameAttachmentFolders: {

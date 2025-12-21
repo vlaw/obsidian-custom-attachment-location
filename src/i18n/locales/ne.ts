@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const ne: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'के तपाईँ फोल्डरमा सबै नोटहरूका लागि संलग्नकहरू संकलन गर्न चाहनुहुन्छ:',
-      part2: 'र यसका सबै उपफोल्डरहरूमा?',
-      part3: 'यो कार्य पूर्वावस्थामा फर्काउन सकिंदैन।'
+      part1: 'के तपाईं फोल्डरहरूभित्रका सबै नोटहरूका लागि संलग्नकहरूलाई पुनरावर्ती रूपमा सङ्कलन गर्न चाहनुहुन्छ?',
+      part2: 'यो कार्य उल्ट्याउन सकिँदैन।'
     },
     progressBar: {
       message: 'संलग्नकहरू संकलन गर्दै {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const ne: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'सम्पूर्ण भाल्टमा संलग्नकहरू संकलन गर्नुहोस्'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'फोल्डरमा संलग्नकहरू संकलन गर्नुहोस्'
+    collectAttachmentsInFile: 'फाइलमा संलग्नकहरू सङ्कलन गर्नुहोस्',
+    collectAttachmentsInFiles: 'फाइलहरूमा संलग्नकहरू सङ्कलन गर्नुहोस्'
   },
   notice: {
     collectingAttachments: '\'{{noteFilePath}}\' का लागि संलग्नकहरू संकलन गर्दै',
@@ -172,6 +172,13 @@ export const ne: Translations<PluginTypes> = {
       },
       name: 'धेरै नोटहरूद्वारा प्रयोग हुने संलग्नक संकलन मोड'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'उपलब्ध',
+        part2: 'टोकनहरू हेर्नुहोस्'
+      },
+      name: 'संकलित संलग्नक फाइल नाम'
+    },
     customTokens: {
       description: {
         part1: 'प्रयोग गर्नका लागि कस्टम टोकनहरू।',
@@ -268,6 +275,13 @@ export const ne: Translations<PluginTypes> = {
       name: 'मार्कडाउन यूआरएल ढाँचा'
     },
     renameAttachmentsToLowerCase: 'संलग्नकहरूलाई सानो अक्षरमा पुनः नामकरण गर्नुहोस्',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'उपलब्ध',
+        part2: 'टोकनहरू हेर्नुहोस्'
+      },
+      name: 'पुनः नामकरण गरिएको संलग्नक फाइल नाम'
+    },
     resetToSampleCustomTokens: {
       message: 'के तपाईँ कस्टम टोकनहरूलाई नमुना कस्टम टोकनहरूमा रिसेट गर्न चाहनुहुन्छ? तपाईँका परिवर्तनहरू हराउनेछन्।',
       title: 'नमुना कस्टम टोकनहरूमा रिसेट गर्नुहोस्'
@@ -281,7 +295,10 @@ export const ne: Translations<PluginTypes> = {
       name: 'अनाथ संलग्नकहरू मेटाउनुपर्छ'
     },
     shouldRenameAttachmentFiles: {
-      description: 'जब नोट पुनः नामकरण वा सारिन्छ, संलग्नक फाइलहरू पुनः नामकरण गर्ने वा नगर्ने।',
+      description: {
+        part1: 'यदि सक्षम गरिएको छ भने, जब नोट पुनः नामकरण वा सारिन्छ, यसका संलग्नकहरू',
+        part2: 'सेटिङ अनुसार पुनः नामकरण गरिनेछन्।'
+      },
       name: 'संलग्नक फाइलहरू पुनः नामकरण गर्नुपर्छ'
     },
     shouldRenameAttachmentFolders: {

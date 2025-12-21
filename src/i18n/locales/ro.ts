@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const ro: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Doriți să colectați atașamentele pentru toate notițele din dosarul:',
-      part2: 'și toate subdosarele acestuia?',
-      part3: 'Această operațiune nu poate fi anulată.'
+      part1: 'Doriți să colectați atașamentele pentru toate notițele din foldere în mod recursiv?',
+      part2: 'Această operațiune nu poate fi anulată.'
     },
     progressBar: {
       message: 'Colectez atașamente {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const ro: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Colectează atașamentele din întregul seif'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Colectează atașamentele din dosar'
+    collectAttachmentsInFile: 'Colectează atașamentele în fișier',
+    collectAttachmentsInFiles: 'Colectează atașamentele în fișiere'
   },
   notice: {
     collectingAttachments: 'Colectez atașamentele pentru \'{{noteFilePath}}\'',
@@ -175,6 +175,13 @@ export const ro: Translations<PluginTypes> = {
       },
       name: 'Mod colectare atașamente folosite de mai multe notițe'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Vezi',
+        part2: 'tokenuri disponibile'
+      },
+      name: 'Nume fișier atașament colectat'
+    },
     customTokens: {
       description: {
         part1: 'Tokenuri personalizate de utilizat.',
@@ -272,6 +279,13 @@ export const ro: Translations<PluginTypes> = {
       name: 'Format URL Markdown'
     },
     renameAttachmentsToLowerCase: 'Redenumește atașamentele cu litere mici',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Vezi',
+        part2: 'tokenuri disponibile'
+      },
+      name: 'Nume fișier atașament redenumit'
+    },
     resetToSampleCustomTokens: {
       message: 'Sigur doriți să resetați tokenurile personalizate la tokenurile exemplu? Modificările dvs. vor fi pierdute.',
       title: 'Resetează la tokenuri exemplu'
@@ -286,7 +300,10 @@ export const ro: Translations<PluginTypes> = {
       name: 'Șterge atașamentele orfane'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Stabilește dacă fișierele atașament vor fi redenumite când o notiță este redenumită sau mutată.',
+      description: {
+        part1: 'Dacă este activat, atunci când o notiță este redenumită sau mutată, atașamentele vor fi redenumite conform',
+        part2: 'setării.'
+      },
       name: 'Redenumește fișierele atașament'
     },
     shouldRenameAttachmentFolders: {

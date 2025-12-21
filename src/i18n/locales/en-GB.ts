@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const enGB: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Do you want to collect attachments for all notes in folder:',
-      part2: 'and all its subfolders?',
-      part3: 'This operation cannot be undone.'
+      part1: 'Do you want to collect attachments for all notes in folders recursively?',
+      part2: 'This operation cannot be undone.'
     },
     progressBar: {
       message: 'Collecting attachments {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const enGB: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Collect attachments in entire vault'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Collect attachments in folder'
+    collectAttachmentsInFile: 'Collect attachments in file',
+    collectAttachmentsInFiles: 'Collect attachments in files'
   },
   notice: {
     collectingAttachments: 'Collecting attachments for \'{{noteFilePath}}\'',
@@ -174,6 +174,15 @@ export const enGB: Translations<PluginTypes> = {
       },
       name: 'Collect attachment used by multiple notes mode'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'See available',
+        part2: 'tokens',
+        part3: 'Leave blank to use',
+        part4: 'setting instead.'
+      },
+      name: 'Collected attachment file name'
+    },
     customTokens: {
       description: {
         part1: 'Custom tokens to be used.',
@@ -270,6 +279,15 @@ export const enGB: Translations<PluginTypes> = {
       name: 'Markdown URL format'
     },
     renameAttachmentsToLowerCase: 'Rename attachments to lower case',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'See available',
+        part2: 'tokens',
+        part3: 'Leave blank to use',
+        part4: 'setting instead.'
+      },
+      name: 'Renamed attachment file name'
+    },
     resetToSampleCustomTokens: {
       message: 'Are you sure you want to reset the custom tokens to the sample custom tokens? Your changes will be lost.',
       title: 'Reset to sample custom tokens'
@@ -284,7 +302,10 @@ export const enGB: Translations<PluginTypes> = {
       name: 'Should delete orphan attachments'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Whether to rename attachment files when a note is renamed or moved.',
+      description: {
+        part1: 'If enabled, when a note is renamed or moved, its attachments will be renamed according to the',
+        part2: 'setting.'
+      },
       name: 'Should rename attachment files'
     },
     shouldRenameAttachmentFolders: {

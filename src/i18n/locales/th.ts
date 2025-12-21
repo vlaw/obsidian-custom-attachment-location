@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const th: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'คุณต้องการรวบรวมไฟล์แนบสำหรับโน้ตทั้งหมดในโฟลเดอร์:',
-      part2: 'และโฟลเดอร์ย่อยทั้งหมดหรือไม่?',
-      part3: 'การดำเนินการนี้ไม่สามารถย้อนกลับได้'
+      part1: 'คุณต้องการรวบรวมไฟล์แนบสำหรับโน้ตทั้งหมดในโฟลเดอร์แบบเรียกซ้ำหรือไม่?',
+      part2: 'การดำเนินการนี้ไม่สามารถยกเลิกได้'
     },
     progressBar: {
       message: 'กำลังรวบรวมไฟล์แนบ {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const th: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'รวบรวมไฟล์แนบในคลังข้อมูลทั้งหมด'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'รวบรวมไฟล์แนบในโฟลเดอร์'
+    collectAttachmentsInFile: 'รวบรวมไฟล์แนบในไฟล์',
+    collectAttachmentsInFiles: 'รวบรวมไฟล์แนบในหลายไฟล์'
   },
   notice: {
     collectingAttachments: 'กำลังรวบรวมไฟล์แนบสำหรับ \'{{noteFilePath}}\'',
@@ -172,6 +172,13 @@ export const th: Translations<PluginTypes> = {
       },
       name: 'โหมดรวบรวมไฟล์แนบที่ใช้หลายโน้ต'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'ดู',
+        part2: 'โทเคนที่มีให้'
+      },
+      name: 'ชื่อไฟล์แนบที่รวบรวม'
+    },
     customTokens: {
       description: {
         part1: 'โทเคนที่กำหนดเองที่ใช้',
@@ -268,6 +275,13 @@ export const th: Translations<PluginTypes> = {
       name: 'รูปแบบ URL ของ Markdown'
     },
     renameAttachmentsToLowerCase: 'เปลี่ยนชื่อไฟล์แนบเป็นตัวพิมพ์เล็ก',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'ดู',
+        part2: 'โทเคนที่มีให้'
+      },
+      name: 'ชื่อไฟล์แนบที่เปลี่ยนชื่อ'
+    },
     resetToSampleCustomTokens: {
       message: 'แน่ใจหรือไม่ว่าต้องการรีเซ็ตโทเคนที่กำหนดเองไปยังโทเคนตัวอย่าง? การเปลี่ยนแปลงทั้งหมดจะสูญหาย',
       title: 'รีเซ็ตเป็นโทเคนตัวอย่าง'
@@ -281,7 +295,10 @@ export const th: Translations<PluginTypes> = {
       name: 'ลบไฟล์แนบที่ถูกทิ้ง'
     },
     shouldRenameAttachmentFiles: {
-      description: 'กำหนดว่าจะเปลี่ยนชื่อไฟล์แนบเมื่อโน้ตถูกเปลี่ยนชื่อหรือย้ายหรือไม่',
+      description: {
+        part1: 'หากเปิดใช้งาน เมื่อโน้ตถูกเปลี่ยนชื่อหรือย้าย ไฟล์แนบจะถูกเปลี่ยนชื่อตาม',
+        part2: 'การตั้งค่า'
+      },
       name: 'เปลี่ยนชื่อไฟล์แนบ'
     },
     shouldRenameAttachmentFolders: {

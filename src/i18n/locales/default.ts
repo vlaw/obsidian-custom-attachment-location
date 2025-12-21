@@ -3,9 +3,8 @@ import type { DefaultTranslationsBase } from 'obsidian-dev-utils/obsidian/i18n/D
 export const defaultTranslations = {
   attachmentCollector: {
     confirm: {
-      part1: 'Do you want to collect attachments for all notes in folder:',
-      part2: 'and all its subfolders?',
-      part3: 'This operation cannot be undone.'
+      part1: 'Do you want to collect attachments for all notes in folders recursively?',
+      part2: 'This operation cannot be undone.'
     },
     progressBar: {
       message: 'Collecting attachments {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -14,8 +13,10 @@ export const defaultTranslations = {
   },
   buttons: {
     copy: 'Copy',
+    copyAll: 'Copy all',
     move: 'Move',
     previewAttachmentFile: 'Preview attachment file',
+    select: 'Select',
     skip: 'Skip'
   },
   collectAttachmentUsedByMultipleNotesModal: {
@@ -29,14 +30,33 @@ export const defaultTranslations = {
   commands: {
     collectAttachmentsCurrentFolder: 'Collect attachments in current folder',
     collectAttachmentsCurrentNote: 'Collect attachments in current note',
-    collectAttachmentsEntireVault: 'Collect attachments in entire vault'
+    collectAttachmentsEntireVault: 'Collect attachments in entire vault',
+    moveAttachmentToProperFolder: 'Move attachment to proper folder'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Collect attachments in folder'
+    collectAttachmentsInFile: 'Collect attachments in file',
+    collectAttachmentsInFiles: 'Collect attachments in files'
+  },
+  moveAttachmentToProperFolder: {
+    progressBar: {
+      message: 'Moving attachment to proper folder {{iterationStr}} - \'{{attachmentFilePath}}\'.',
+      title: 'Moving attachment to proper folder...'
+    },
+    unusedAttachment: 'Attachment {{attachmentPath}} is not used by any note. It will not be moved.'
+  },
+  moveAttachmentToProperFolderUsedByMultipleNotesModal: {
+    content: {
+      part1: 'Attachment',
+      part2: 'is referenced by multiple notes.',
+      part3: 'Select notes to copy the attachment to.'
+    },
+    heading: 'Collecting attachment used by multiple notes',
+    shouldUseSameActionForOtherProblematicAttachmentsToggle: 'Should use the same action for other problematic attachments'
   },
   notice: {
     collectingAttachments: 'Collecting attachments for \'{{noteFilePath}}\'',
     collectingAttachmentsCancelled: 'Collecting attachments cancelled. See console for details.',
+    couldNotResolveTemplatePath: 'Could not resolve template path \'{{template}}\'. See console for details.',
     generatedAttachmentFileNameIsInvalid: {
       part1: 'Generated attachment file name \'{{path}}\' is invalid.\n{{validationMessage}}\nCheck your',
       part2: 'setting.'
@@ -112,6 +132,24 @@ export const defaultTranslations = {
         description: 'will keep the empty attachment folder.',
         displayText: 'Keep'
       }
+    },
+    moveAttachmentToProperFolderUsedByMultipleNotesMode: {
+      cancel: {
+        description: 'cancel the attachment collecting.',
+        displayText: 'Cancel'
+      },
+      copyAll: {
+        description: 'copy the attachment to the new location for all notes.',
+        displayText: 'Copy all'
+      },
+      prompt: {
+        description: 'prompt the user to choose the action.',
+        displayText: 'Prompt'
+      },
+      skip: {
+        description: 'skip the attachment and proceed to the next one.',
+        displayText: 'Skip'
+      }
     }
   },
   pluginSettingsManager: {
@@ -171,6 +209,15 @@ export const defaultTranslations = {
         part1: 'When the collected attachment is used by multiple notes:'
       },
       name: 'Collect attachment used by multiple notes mode'
+    },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'See available',
+        part2: 'tokens',
+        part3: 'Leave empty to use',
+        part4: 'setting instead.'
+      },
+      name: 'Collected attachment file name'
     },
     customTokens: {
       description: {
@@ -249,7 +296,7 @@ export const defaultTranslations = {
     locationForNewAttachments: {
       description: {
         part1: 'Start with',
-        part2: 'to use relative path.',
+        part2: 'for paths relative to parent folder of note.',
         part3: 'See available',
         part4: 'tokens',
         part5: 'Dot-folders like',
@@ -267,7 +314,22 @@ export const defaultTranslations = {
       },
       name: 'Markdown URL format'
     },
+    moveAttachmentToProperFolderUsedByMultipleNotesMode: {
+      description: {
+        part1: 'When the attachment is used by multiple notes:'
+      },
+      name: 'Move attachment to proper folder used by multiple notes mode'
+    },
     renameAttachmentsToLowerCase: 'Rename attachments to lower case',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'See available',
+        part2: 'tokens',
+        part3: 'Leave empty to use',
+        part4: 'setting instead.'
+      },
+      name: 'Renamed attachment file name'
+    },
     resetToSampleCustomTokens: {
       message: 'Are you sure you want to reset the custom tokens to the sample custom tokens? Your changes will be lost.',
       title: 'Reset to sample custom tokens'
@@ -281,8 +343,15 @@ export const defaultTranslations = {
       description: 'If enabled, when the note is deleted, its orphan attachments are deleted as well.',
       name: 'Should delete orphan attachments'
     },
+    shouldHandleRenames: {
+      description: 'Whether to handle renames.',
+      name: 'Should handle renames'
+    },
     shouldRenameAttachmentFiles: {
-      description: 'Whether to rename attachment files when a note is renamed or moved.',
+      description: {
+        part1: 'If enabled, when a note is renamed or moved, its attachments will be renamed according to the',
+        part2: 'setting.'
+      },
       name: 'Should rename attachment files'
     },
     shouldRenameAttachmentFolders: {
@@ -327,7 +396,8 @@ export const defaultTranslations = {
         part3: 'and',
         part4: 'linked files are not treated as attachments and are not moved with the note.',
         part5: 'You can add custom extensions, e.g.',
-        part6: ', to override this behavior.'
+        part6: ', to override this behavior.',
+        part7: 'Insert each extension on a new line.'
       },
       name: 'Treat as attachment extensions'
     }

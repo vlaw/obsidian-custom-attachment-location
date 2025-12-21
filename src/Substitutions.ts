@@ -5,9 +5,9 @@ import type {
 } from 'obsidian';
 import type { Promisable } from 'type-fest';
 
-import moment from 'moment';
 // eslint-disable-next-line import-x/no-namespace -- Need to pass entire obsidian module.
 import * as obsidian from 'obsidian';
+import { moment as moment_ } from 'obsidian';
 import { printError } from 'obsidian-dev-utils/Error';
 import {
   extractDefaultExportInterop,
@@ -39,6 +39,8 @@ import { promptWithPreview } from './PromptWithPreviewModal.ts';
 import { ActionContext } from './TokenEvaluatorContext.ts';
 
 const slugify = extractDefaultExportInterop(slugify_);
+
+const moment = extractDefaultExportInterop(moment_);
 
 interface FormatWithParameter {
   base: string;
@@ -80,6 +82,7 @@ interface SubstitutionsOptions {
   oldNoteFilePath?: string | undefined;
   originalAttachmentFileName?: string;
   plugin: Plugin;
+  sequenceNumber?: number | undefined;
 }
 
 interface ValidateFileNameOptions {
@@ -291,9 +294,9 @@ export class Substitutions {
     this.registerCustomTokens('');
   }
 
+  public readonly actionContext: ActionContext;
   public readonly noteFolderPath: string;
 
-  private readonly actionContext: ActionContext;
   private readonly app: App;
   private readonly attachmentFileContent: ArrayBuffer | undefined;
   private readonly attachmentFileStat: FileStats | undefined;
@@ -311,6 +314,7 @@ export class Substitutions {
   private readonly originalAttachmentFileExtension: string;
   private readonly originalAttachmentFileName: string;
   private readonly plugin: Plugin;
+  private readonly sequenceNumber: number | undefined;
 
   public constructor(options: SubstitutionsOptions) {
     this.plugin = options.plugin;
@@ -397,6 +401,14 @@ export class Substitutions {
 
     this.registerToken('heading', async (ctx, substitutions) => substitutions.getHeading(ctx.format));
 
+    this.registerToken('sequenceNumber', (ctx) => {
+      let length = Number(ctx.format);
+      if (Number.isNaN(length) || length < 1) {
+        length = 1;
+      }
+      return String(ctx.sequenceNumber).padStart(length, '0');
+    });
+
     this.registerToken('md5', (ctx) => generateMd5(ctx.attachmentFileContent));
 
     const customTokens = parseCustomTokens(customTokensStr) ?? new Map<string, TokenEvaluator>();
@@ -440,6 +452,7 @@ export class Substitutions {
         oldNoteFolderPath: this.oldNoteFolderPath,
         originalAttachmentFileExtension: this.originalAttachmentFileExtension,
         originalAttachmentFileName: this.originalAttachmentFileName,
+        sequenceNumber: this.sequenceNumber ?? 0,
         token,
         tokenEndOffset: args.offset + args.substring.length,
         tokenStartOffset: args.offset,

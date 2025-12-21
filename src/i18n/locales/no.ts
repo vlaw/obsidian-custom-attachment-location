@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const no: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Ønsker du å samle vedlegg for alle notater i mappen:',
-      part2: 'og alle undermappene?',
-      part3: 'Denne operasjonen kan ikke angres.'
+      part1: 'Vil du samle vedlegg for alle notater i mapper rekursivt?',
+      part2: 'Denne operasjonen kan ikke angres.'
     },
     progressBar: {
       message: 'Samler vedlegg {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const no: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Samle vedlegg i hele krypteret'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Samle vedlegg i mappe'
+    collectAttachmentsInFile: 'Samle vedlegg i fil',
+    collectAttachmentsInFiles: 'Samle vedlegg i filer'
   },
   notice: {
     collectingAttachments: 'Samler vedlegg for \'{{noteFilePath}}\'',
@@ -173,6 +173,13 @@ export const no: Translations<PluginTypes> = {
       },
       name: 'Samle vedlegg brukt av flere notater modus'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Se tilgjengelige',
+        part2: 'tokens'
+      },
+      name: 'Samlet vedleggsfilnavn'
+    },
     customTokens: {
       description: {
         part1: 'Tilpassede tokens som skal brukes.',
@@ -269,6 +276,13 @@ export const no: Translations<PluginTypes> = {
       name: 'Markdown URL format'
     },
     renameAttachmentsToLowerCase: 'Omdøp vedlegg til små bokstaver',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Se tilgjengelige',
+        part2: 'tokens'
+      },
+      name: 'Omdøpt vedleggsfilnavn'
+    },
     resetToSampleCustomTokens: {
       message: 'Er du sikker på at du vil tilbakestille de tilpassede tokens til eksempel tilpassede tokens? Endringene dine vil gå tapt.',
       title: 'Tilbakestill til eksempel tilpassede tokens'
@@ -283,7 +297,10 @@ export const no: Translations<PluginTypes> = {
       name: 'Skal slette forældreløse vedlegg'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Om vedleggsfiler skal omdøpes når et notat omdøpes eller flyttes.',
+      description: {
+        part1: 'Hvis aktivert, når et notat omdøpes eller flyttes, vil vedleggene bli omdøpt i henhold til',
+        part2: 'innstillingen.'
+      },
       name: 'Skal omdøpe vedleggsfiler'
     },
     shouldRenameAttachmentFolders: {

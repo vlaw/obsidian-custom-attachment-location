@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const am: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'በፎልደሩ ውስጥ ለሁሉም ማስታወሻዎች ተያያዥ ፋይሎችን መሰብሰብ ይፈልጋሉ:',
-      part2: 'እና ሁሉንም ንዑስ ፎልደሮች?',
-      part3: 'ይህ ስራ ሊመለስ አይችልም።'
+      part1: 'በአቃፊዎች ውስጥ ላሉ ሁሉም ማስታወሻዎች ተያያዥ ፋይሎችን በተደጋጋሚ መሰብሰብ ትፈልጋለህ?',
+      part2: 'ይህ እርምጃ መመለስ አይቻልም።'
     },
     progressBar: {
       message: 'ተያያዥ ፋይሎችን በመሰብሰብ ላይ {{iterationStr}} - \'{{noteFilePath}}\'።',
@@ -34,7 +33,8 @@ export const am: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'በሙሉ ቫውልት ውስጥ ተያያዦችን መሰብሰብ'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'በፎልደር ውስጥ ተያያዦችን መሰብሰብ'
+    collectAttachmentsInFile: 'በፋይል ውስጥ ተያያዥ ፋይሎችን ሰብስብ',
+    collectAttachmentsInFiles: 'በፋይሎች ውስጥ ተያያዥ ፋይሎችን ሰብስብ'
   },
   notice: {
     collectingAttachments: 'ለ \'{{noteFilePath}}\' ተያያዦችን በመሰብሰብ ላይ',
@@ -172,6 +172,15 @@ export const am: Translations<PluginTypes> = {
       },
       name: 'በበርካታ ማስታወሻዎች የሚጠቀም ተያያዥ መሰብሰብ ሁነታ'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'የሚገኙ',
+        part2: 'ቶከኖችን ይመልከቱ',
+        part3: 'ባዶ ይተው',
+        part4: 'ቅንብርን በምትኩ ለመጠቀም።'
+      },
+      name: 'የተሰበሰበ ተያያዥ ፋይል ስም'
+    },
     customTokens: {
       description: {
         part1: 'የሚጠቀሙ የተለመዱ ቶከኖች።',
@@ -268,6 +277,15 @@ export const am: Translations<PluginTypes> = {
       name: 'Markdown URL ቅርጸት'
     },
     renameAttachmentsToLowerCase: 'ተያያዦችን ወደ ትንሽ ፊደል መለወጥ',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'የሚገኙ',
+        part2: 'ቶከኖችን ይመልከቱ',
+        part3: 'ባዶ ይተው',
+        part4: 'ቅንብርን በምትኩ ለመጠቀም።'
+      },
+      name: 'የተሰየመ ተያያዥ ፋይል ስም'
+    },
     resetToSampleCustomTokens: {
       message: 'የተለመዱ ቶከኖችን ወደ ናሙና የተለመዱ ቶከኖች ማዳከም እርግጠኛ ነዎት? የእርስዎ ለውጦች ይጠፋሉ።',
       title: 'ወደ ናሙና የተለመዱ ቶከኖች መለስ'
@@ -281,7 +299,10 @@ export const am: Translations<PluginTypes> = {
       name: 'የራሱ የሆኑ ተያያዦችን መሰረዝ አለበት'
     },
     shouldRenameAttachmentFiles: {
-      description: 'ማስታወሻ ሲሰየም ወይም ሲወሰድ፣ ተያያዥ ፋይሎችን መሰየም አለበት።',
+      description: {
+        part1: 'ከተንቃ፣ ማስታወሻ ሲሰየም ወይም ሲወሰድ፣ ተያያዦቹ በ',
+        part2: 'ቅንብር መሰረት ይሰየማሉ።'
+      },
       name: 'ተያያዥ ፋይሎችን መሰየም አለበት'
     },
     shouldRenameAttachmentFolders: {

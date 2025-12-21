@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const uk: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Чи хочете ви зібрати вкладення для всіх нотаток у папці:',
-      part2: 'та всіх її підпапках?',
-      part3: 'Цю операцію не можна скасувати.'
+      part1: 'Бажаєте зібрати вкладення для всіх нотаток у папках рекурсивно?',
+      part2: 'Цю операцію неможливо скасувати.'
     },
     progressBar: {
       message: 'Збирання вкладень {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const uk: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Зібрати вкладення в усьому сховищі'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Зібрати вкладення в папці'
+    collectAttachmentsInFile: 'Зібрати вкладення у файлі',
+    collectAttachmentsInFiles: 'Зібрати вкладення у файлах'
   },
   notice: {
     collectingAttachments: 'Збирання вкладень для \'{{noteFilePath}}\'',
@@ -174,6 +174,13 @@ export const uk: Translations<PluginTypes> = {
       },
       name: 'Режим збору вкладень, які використовуються кількома нотатками'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Див. доступні',
+        part2: 'токени'
+      },
+      name: 'Назва зібраного файлу вкладення'
+    },
     customTokens: {
       description: {
         part1: 'Користувацькі токени для використання.',
@@ -271,6 +278,13 @@ export const uk: Translations<PluginTypes> = {
       name: 'Формат URL Markdown'
     },
     renameAttachmentsToLowerCase: 'Перейменовувати вкладення з маленьких літер',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Див. доступні',
+        part2: 'токени'
+      },
+      name: 'Назва перейменованого файлу вкладення'
+    },
     resetToSampleCustomTokens: {
       message: 'Ви впевнені, що хочете скинути користувацькі токени до прикладу? Ваші зміни буде втрачено.',
       title: 'Скинути до прикладу'
@@ -285,7 +299,10 @@ export const uk: Translations<PluginTypes> = {
       name: 'Видаляти осиротілі вкладення'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Перейменовувати файли вкладень при перейменуванні або переміщенні нотатки.',
+      description: {
+        part1: 'Якщо увімкнено, при перейменуванні або переміщенні нотатки її вкладення будуть перейменовані згідно з',
+        part2: 'налаштуванням.'
+      },
       name: 'Перейменовувати файли вкладень'
     },
     shouldRenameAttachmentFolders: {

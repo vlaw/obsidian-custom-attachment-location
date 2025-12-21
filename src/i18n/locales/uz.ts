@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const uz: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'Papkadagi barcha eslatmalar uchun qo\'shimchalarni yig\'moqchimisiz:',
-      part2: 'va uning barcha quyi papkalari?',
-      part3: 'Bu amalni bekor qilib bo\'lmaydi.'
+      part1: 'Papkalardagi barcha qaydlar uchun ilovalarni rekursiv tarzda to‘plamoqchimisiz?',
+      part2: 'Bu amalni ortga qaytarib bo‘lmaydi.'
     },
     progressBar: {
       message: 'Qo\'shimchalarni yig\'layapman {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const uz: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'Butun ombordagi qo\'shimchalarni yig\'lash'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'Papkadagi qo\'shimchalarni yig\'lash'
+    collectAttachmentsInFile: 'Faylda ilovalarni to‘plash',
+    collectAttachmentsInFiles: 'Fayllarda ilovalarni to‘plash'
   },
   notice: {
     collectingAttachments: '\'{{noteFilePath}}\' uchun qo\'shimchalarni yig\'layapman',
@@ -174,6 +174,13 @@ export const uz: Translations<PluginTypes> = {
       },
       name: 'Bir nechta eslatmalar tomonidan foydalanilgan qo\'shimchani yig\'ish rejimi'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'Mavjud',
+        part2: 'tokenlarni ko\'ring'
+      },
+      name: 'Yig\'ilgan qo\'shimcha fayl nomi'
+    },
     customTokens: {
       description: {
         part1: 'Foydalaniladigan maxsus tokenlar.',
@@ -271,6 +278,13 @@ export const uz: Translations<PluginTypes> = {
       name: 'Markdown URL formati'
     },
     renameAttachmentsToLowerCase: 'Qo\'shimchilarning nomlarini kichik harflarga o\'zgartirish',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'Mavjud',
+        part2: 'tokenlarni ko\'ring'
+      },
+      name: 'Qayta nomlangan qo\'shimcha fayl nomi'
+    },
     resetToSampleCustomTokens: {
       message: 'Maxsus tokenlarni namuna tokenlarga qaytarishni xohlaysizmi? O\'zgartirishlaringiz yo\'qoladi.',
       title: 'Namuna tokenlarga qaytarish'
@@ -285,7 +299,10 @@ export const uz: Translations<PluginTypes> = {
       name: 'Osmonga ketgan qo\'shimchalarni o\'chirish'
     },
     shouldRenameAttachmentFiles: {
-      description: 'Nota nomi o\'zgartirilganda yoki ko\'chirilganda qo\'shimcha fayllar nomini o\'zgartirish kerakligini belgilaydi.',
+      description: {
+        part1: 'Faollashtirilganda, nota nomi o\'zgartirilganda yoki ko\'chirilganda, qo\'shimchalar',
+        part2: 'sozlash bo\'yicha qayta nomlanadi.'
+      },
       name: 'Qo\'shimcha fayllarni qayta nomlash'
     },
     shouldRenameAttachmentFolders: {

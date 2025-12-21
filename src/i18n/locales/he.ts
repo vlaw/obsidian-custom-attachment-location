@@ -5,9 +5,8 @@ import type { PluginTypes } from '../../PluginTypes.ts';
 export const he: Translations<PluginTypes> = {
   attachmentCollector: {
     confirm: {
-      part1: 'האם אתה רוצה לאסוף קבצים מצורפים עבור כל הרשימות בתיקייה:',
-      part2: 'וכל תת-התיקיות שלה?',
-      part3: 'פעולה זו לא ניתנת לביטול.'
+      part1: 'האם ברצונך לאסוף קבצים מצורפים לכל ההערות בתיקיות באופן רקורסיבי?',
+      part2: 'לא ניתן לבטל פעולה זו.'
     },
     progressBar: {
       message: 'אוסף קבצים מצורפים {{iterationStr}} - \'{{noteFilePath}}\'.',
@@ -34,7 +33,8 @@ export const he: Translations<PluginTypes> = {
     collectAttachmentsEntireVault: 'אסוף קבצים מצורפים בכל הכספת'
   },
   menuItems: {
-    collectAttachmentsInFolder: 'אסוף קבצים מצורפים בתיקייה'
+    collectAttachmentsInFile: 'איסוף קבצים מצורפים בקובץ',
+    collectAttachmentsInFiles: 'איסוף קבצים מצורפים בקבצים'
   },
   notice: {
     collectingAttachments: 'אוסף קבצים מצורפים עבור \'{{noteFilePath}}\'',
@@ -172,6 +172,15 @@ export const he: Translations<PluginTypes> = {
       },
       name: 'מצב איסוף קובץ מצורף המשמש מספר רשימות'
     },
+    collectedAttachmentFileName: {
+      description: {
+        part1: 'ראה',
+        part2: 'טוקנים זמינים',
+        part3: 'השאר ריק לשימוש בהגדרת',
+        part4: 'במקום.'
+      },
+      name: 'שם קובץ מצורף שנאסף'
+    },
     customTokens: {
       description: {
         part1: 'טוקנים מותאמים אישיים לשימוש.',
@@ -268,6 +277,15 @@ export const he: Translations<PluginTypes> = {
       name: 'פורמט URL Markdown'
     },
     renameAttachmentsToLowerCase: 'שנה שמות קבצים מצורפים לאותיות קטנות',
+    renamedAttachmentFileName: {
+      description: {
+        part1: 'ראה',
+        part2: 'טוקנים זמינים',
+        part3: 'השאר ריק לשימוש בהגדרת',
+        part4: 'במקום.'
+      },
+      name: 'שם קובץ מצורף ששמו שונה'
+    },
     resetToSampleCustomTokens: {
       message: 'האם אתה בטוח שברצונך לאפס את הטוקנים המותאמים אישיים לטוקנים המותאמים אישיים לדוגמה? השינויים שלך יאבדו.',
       title: 'אפס לטוקנים מותאמים אישיים לדוגמה'
@@ -281,7 +299,10 @@ export const he: Translations<PluginTypes> = {
       name: 'האם למחוק קבצים מצורפים יתומים'
     },
     shouldRenameAttachmentFiles: {
-      description: 'האם לשנות שמות קבצים מצורפים כאשר רשימה מקבלת שם חדש או מועברת.',
+      description: {
+        part1: 'אם מופעל, כאשר רשימה מקבלת שם חדש או מועברת, קבצי המצורפים שלה יקבלו שמות חדשים לפי הגדרת',
+        part2: '.'
+      },
       name: 'האם לשנות שמות קבצים מצורפים'
     },
     shouldRenameAttachmentFolders: {

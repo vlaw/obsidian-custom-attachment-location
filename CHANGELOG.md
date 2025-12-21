@@ -1,10 +1,92 @@
 # CHANGELOG
 
+## 9.24.0
+
+- feat: increase JPEG quality choices re #236
+
+## 9.23.3
+
+- docs: improve description re #238
+
+## 9.23.2
+
+- fix: handle . and .. templates re #239
+
+## 9.23.1
+
+- feat: improve description re <https://github.com/dy-sh/obsidian-consistent-attachments-and-links/issues/144>
+
+## 9.23.0
+
+- feat: add links to attachment/notes re #256
+- chore: update libs
+
+## 9.22.0
+
+- feat: add modal for MoveAttachmentToProperFolder
+- feat: check for duplicates even if attachment is already in place re #257
+
+## 9.21.0
+
+- feat: add shouldHandleRenames re #251
+
+## 9.20.0
+
+- chore: lint
+- fix: hide notice on cancel re #252
+- feat: add cancel mode re #234
+- chore: update libs
+
+## 9.19.0
+
+- feat: move attachment to proper folder re #253
+- feat: allow select multiple notes/folder to collect
+- fix: missed localization
+
+## 9.18.5
+
+- chore: update libs re #254
+- chore: fix electron version, same as in typings
+
+## 9.18.4
+
+- chore: update libs
+
+## 9.18.3
+
+- fix: don't interrupt on timeout re #243
+
+## 9.18.2
+
+- fix: attachment paths for excalidraw re #249
+
+## 9.18.1
+
+- fix: change link on copied collected attachment re #250
+- chore: update libs
+
+## 9.18.0
+
+- feat: add individual rename/collect name settings
+- feat: add ${sequenceNumber} token re #247
+
 ## 9.17.15-beta.1
 
 - chore(linkinator): update skip
 - chore(package-lock): npm install ts-md5
 - feat: md5
+
+## 9.17.17
+
+- fix: show version mismatch alert only once. re #246
+
+## 9.17.16
+
+- chore: update libs
+
+## 9.17.15
+
+- chore: update libs
 
 ## 9.17.14
 

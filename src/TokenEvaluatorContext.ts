@@ -23,6 +23,11 @@ export enum ActionContext {
   ImportFiles = 'ImportFiles',
 
   /**
+   * Move attachment to proper folder.
+   */
+  MoveAttachmentToProperFolder = 'MoveAttachmentToProperFolder',
+
+  /**
    * Open file.
    */
   OpenFile = 'OpenFile',
@@ -168,6 +173,13 @@ export interface TokenEvaluatorContext {
    * A name of the original attachment file.
    */
   originalAttachmentFileName: string;
+
+  /**
+   * A sequence number of the attachment file.
+   *
+   * `0` if the sequence number is not known.
+   */
+  sequenceNumber: number;
 
   /**
    * A token being evaluated.
