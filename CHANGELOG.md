@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 9.24.1-beta.1
+
+- chore(cspell): update words
+- Merge tag 'tags/9.24.0' into develop 9.24.0
+
 ## 9.24.0
 
 - feat: increase JPEG quality choices re #236
