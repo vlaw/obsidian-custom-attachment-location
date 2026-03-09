@@ -23,6 +23,7 @@ import type { PluginTypes } from './PluginTypes.ts';
 import {
   AttachmentRenameMode,
   CollectAttachmentUsedByMultipleNotesMode,
+  ConvertImagesToJpegMode,
   DefaultImageSizeDimension,
   MoveAttachmentToProperFolderUsedByMultipleNotesMode,
   SAMPLE_CUSTOM_TOKENS
@@ -149,7 +150,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
     new SettingEx(this.containerEl)
       .setName(t(($) => $.pluginSettingsTab.shouldHandleRenames.name))
-      .setDesc(t(($) => $.pluginSettingsTab.shouldHandleRenames.description))
+      .setDesc(createFragment((f) => {
+        f.appendText(t(($) => $.pluginSettingsTab.shouldHandleRenames.description.part1));
+        f.createEl('br');
+        f.appendText(t(($) => $.pluginSettingsTab.shouldHandleRenames.description.part2));
+        f.appendText(' ');
+        f.createEl('a', {
+          href: 'obsidian://show-plugin?id=backlink-cache',
+          text: 'Backlink Cache'
+        });
+        f.appendText(' ');
+        f.appendText(t(($) => $.pluginSettingsTab.shouldHandleRenames.description.part3));
+      }))
       .addToggle((toggle) => {
         this.bind(toggle, 'shouldHandleRenames', {
           onChanged: () => {
@@ -237,16 +249,44 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       }))
       .addText((text) => {
         this.bind(text, 'specialCharactersReplacement', {
+          componentToPluginSettingsValueConverter: restoreSpaceCharacter,
+          pluginSettingsToComponentValueConverter: showSpaceCharacter,
           shouldResetSettingWhenComponentIsEmpty: false,
           shouldShowPlaceholderForDefaultValues: false
         });
       });
 
     new SettingEx(this.containerEl)
-      .setName(t(($) => $.pluginSettingsTab.shouldConvertPastedImagesToJpeg.name))
-      .setDesc(t(($) => $.pluginSettingsTab.shouldConvertPastedImagesToJpeg.description))
-      .addToggle((toggle) => {
-        this.bind(toggle, 'shouldConvertPastedImagesToJpeg');
+      .setName(t(($) => $.pluginSettingsTab.convertImagesToJpegMode.name))
+      .setDesc(createFragment((f) => {
+        f.appendText(t(($) => $.pluginSettingsTab.convertImagesToJpegMode.description.part1));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.convertImagesToJpegMode.none.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.convertImagesToJpegMode.none.description));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.convertImagesToJpegMode.onlyPastedClipboardPngImages.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.convertImagesToJpegMode.onlyPastedClipboardPngImages.description));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.convertImagesToJpegMode.allImagesExceptAlreadyJpeg.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.convertImagesToJpegMode.allImagesExceptAlreadyJpeg.description));
+        f.createEl('br');
+        appendCodeBlock(f, t(($) => $.pluginSettings.convertImagesToJpegMode.allImages.displayText));
+        f.appendText(' - ');
+        f.appendText(t(($) => $.pluginSettings.convertImagesToJpegMode.allImages.description));
+      }))
+      .addDropdown((dropdown) => {
+        dropdown.addOptions({
+          /* eslint-disable perfectionist/sort-objects -- Need to keep enum order. */
+          [ConvertImagesToJpegMode.None]: t(($) => $.pluginSettings.convertImagesToJpegMode.none.displayText),
+          [ConvertImagesToJpegMode.OnlyPastedClipboardPngImages]: t(($) => $.pluginSettings.convertImagesToJpegMode.onlyPastedClipboardPngImages.displayText),
+          [ConvertImagesToJpegMode.AllImagesExceptAlreadyJpegFiles]: t(($) => $.pluginSettings.convertImagesToJpegMode.allImagesExceptAlreadyJpeg.displayText),
+          [ConvertImagesToJpegMode.AllImages]: t(($) => $.pluginSettings.convertImagesToJpegMode.allImages.displayText)
+          /* eslint-enable perfectionist/sort-objects -- Need to keep enum order. */
+        });
+        this.bind(dropdown, 'convertImagesToJpegMode');
       });
 
     new SettingEx(this.containerEl)

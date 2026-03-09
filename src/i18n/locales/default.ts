@@ -115,6 +115,24 @@ export const defaultTranslations = {
         displayText: 'Skip'
       }
     },
+    convertImagesToJpegMode: {
+      allImages: {
+        description: 'all images are converted to JPEG.',
+        displayText: 'All images'
+      },
+      allImagesExceptAlreadyJpeg: {
+        description: 'all images except already JPEG files are converted to JPEG.',
+        displayText: 'All images except already JPEG'
+      },
+      none: {
+        description: 'do not convert images to JPEG.',
+        displayText: 'None'
+      },
+      onlyPastedClipboardPngImages: {
+        description: 'only convert pasted clipboard PNG images to JPEG.',
+        displayText: 'Only pasted clipboard PNG images'
+      }
+    },
     defaultImageSizeDimension: {
       height: 'Height',
       width: 'Width'
@@ -218,6 +236,12 @@ export const defaultTranslations = {
         part4: 'setting instead.'
       },
       name: 'Collected attachment file name'
+    },
+    convertImagesToJpegMode: {
+      description: {
+        part1: 'Which images to convert to JPEG:'
+      },
+      name: 'Convert images to JPEG mode'
     },
     customTokens: {
       description: {
@@ -344,7 +368,11 @@ export const defaultTranslations = {
       name: 'Should delete orphan attachments'
     },
     shouldHandleRenames: {
-      description: 'Whether to handle renames.',
+      description: {
+        part1: 'Whether to handle renames.',
+        part2: 'To handle links to/from canvas files, you need to additionally install',
+        part3: 'plugin.'
+      },
       name: 'Should handle renames'
     },
     shouldRenameAttachmentFiles: {

@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 9.26.3
+
+- chore: republish
+
+## 9.26.2
+
+- docs: change attribution
+
+## 9.26.1
+
+- fix: add reference to Backlink Cache re #235
+- chore: update libs
+
+## 9.26.0
+
+- feat: convert images to jpeg re #258
+
+## 9.25.0
+
+- feat: visualize whitespace in replacement setting re #232
+- chore: update libs
+
 ## 9.24.1-beta.1
 
 - chore(cspell): update words
