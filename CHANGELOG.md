@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 9.26.4-beta.1
+
+- Merge upstream master into develop Merges upstream changes from RainCat1998/obsidian-custom-attachment-location Includes upstream versions 9.25.0 to 9.26.3: - feat: visualize whitespace in replacement setting re #232 - feat: convert images to jpeg re #258 - fix: add reference to Backlink Cache re #235 - docs: change attribution - chore: republish - chore: update libs Resolved merge conflicts in: - CHANGELOG.md: combined version histories - package.json: kept upstream version 9.26.3 - package-lock.json: used upstream version
+- chore: release 9.24.1-beta.1
+- chore(cspell): update words
+- Merge tag 'tags/9.24.0' into develop 9.24.0
+- chore: release 9.17.15-beta.1
+- chore(linkinator): update skip
+- chore(package-lock): npm install ts-md5
+- feat: md5
+
 ## 9.26.3
 
 - chore: republish
