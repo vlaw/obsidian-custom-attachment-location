@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "obsidian-dev": {
+      "source": "davidvkimball/obsidian-dev-skills",
+      "sourceType": "github",
+      "computedHash": "e2479fcfb61c2ff7288a639d428b6db94841ace1ac309813d1b6d1ed288c440f"
+    }
+  }
+}
