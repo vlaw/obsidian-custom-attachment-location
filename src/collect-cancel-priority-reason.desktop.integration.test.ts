@@ -19,7 +19,15 @@ import {
 const PLUGIN_ID = 'obsidian-custom-attachment-location';
 const COLLECT_COMMAND_ID = 'obsidian-custom-attachment-location:collect-attachments-in-file';
 const REASON_SELECTOR = '.custom-attachment-location-no-priority-winner-reason';
-const WAIT_TIMEOUT_IN_MILLISECONDS = 20_000;
+/*
+ * Under the transport's ~30s per-closure cap, not at it.
+ * The closure spends this ceiling four times over, so at 20_000 it declared 80s.
+ * The eval is killed at the cap first and reported as a bare transport timeout.
+ * That names the harness rather than the wait that overran.
+ * Each step is a vault operation or a modal in a small temp vault, well under a second.
+ * The constant feeds nothing but closure input, so no Node-side wait sees the change.
+ */
+const WAIT_TIMEOUT_IN_MILLISECONDS = 6000;
 
 interface ProbeResult {
   readonly emptyListReason: string;

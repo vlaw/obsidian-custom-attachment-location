@@ -31,7 +31,15 @@ const ORPHAN_SCAN_MODE_LISTED_PATHS = 'Listed paths';
  * internal queue behind whatever else is in flight, and cutting it too fine just converts a slow-but-correct
  * pass into "the orphan was never trashed".
  */
-const WAIT_TIMEOUT_IN_MILLISECONDS = 20_000;
+/*
+ * Under the transport's ~30s per-closure cap, not at it.
+ * Four waits and three settles share this one budget, so at 20_000 apiece the closure declared 83s.
+ * The eval is killed at the cap first and reported as a bare transport timeout.
+ * That names the harness rather than the wait that overran.
+ * The sweep runs over a small temp vault, so each step lands in well under a second.
+ * The constant feeds nothing but closure input, so no Node-side wait sees the change.
+ */
+const WAIT_TIMEOUT_IN_MILLISECONDS = 5000;
 
 interface ProbeResult {
   readonly confirmText: string;
