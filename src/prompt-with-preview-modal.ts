@@ -181,7 +181,7 @@ class PromptWithPreviewModal extends Modal {
     /*
      * `AbstractTextComponent` forces `spellcheck="false"` on every text component, so the mode has to
      * be applied here. This box names a file, so it follows `Editor > Spellcheck` — the same thing
-     * ODU's own `prompt()` does, and what Obsidian's file explorer does for an inline rename.
+     * the `prompt()` in obsidian-dev-utils does, and what Obsidian's file explorer does for an inline rename.
      */
     applySpellcheckMode({
       app: this.app,

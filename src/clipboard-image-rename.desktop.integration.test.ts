@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #31 (G97 for an already-merged OCAL feature): in
+ * End-to-end coverage for issue #31 (G97 for an already-merged feature of this plugin): in
  * "Attachment rename mode: Only pasted images", an image inserted through the clipboard `insertFiles`
  * sink must be renamed per the configured `generatedAttachmentFileName` pattern EVEN when its source
  * name is not `Pasted image <timestamp>` (e.g. a Windows 11 Win+Shift+S screenshot backed by a temp
@@ -128,7 +128,7 @@ describe('Clipboard-inserted image is renamed in "Only pasted images" mode (issu
         await app.workspace.revealLeaf(leaf);
         await sleep(500);
 
-        // The clipboard manager whose `insertFiles` OCAL patches lives on the active markdown view.
+        // The clipboard manager whose `insertFiles` this plugin patches lives on the active markdown view.
         const viewUnknown: unknown = leaf.view;
         const view = viewUnknown as MarkdownViewLike;
         const clipboardManager = view.editMode?.clipboardManager;
@@ -137,7 +137,7 @@ describe('Clipboard-inserted image is renamed in "Only pasted images" mode (issu
         }
 
         // A genuine clipboard image whose source name is NOT `Pasted image <timestamp>` (the exact
-        // Win+Shift+S regression): a real temp file OUTSIDE the vault backs it (so OCAL's
+        // Win+Shift+S regression): a real temp file OUTSIDE the vault backs it (so the plugin's
         // `trySetByPath` stat succeeds), and only the ArrayBuffer-identity flag can mark it pasted.
         const originalBaseName = `screenshot-original-${stamp}`;
         // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron renderer require.
@@ -157,7 +157,7 @@ describe('Clipboard-inserted image is renamed in "Only pasted images" mode (issu
         };
         await clipboardManager.insertFiles([importedAttachment]);
 
-        // The save runs through OCAL's saveAttachment patch; poll until a PNG appears in the vault.
+        // The save runs through the plugin's saveAttachment patch; poll until a PNG appears in the vault.
         let renamedPaths: string[] = [];
         const deadline = Date.now() + 15_000;
         while (Date.now() < deadline) {
