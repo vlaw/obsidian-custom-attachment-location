@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #69 (G97): an attachment unit folder travels whole, so the folder it
+ * End-to-end coverage for issue #69: an attachment unit folder travels whole, so the folder it
  * was carried OUT of is the one left empty — and, with a deleting `emptyFolderBehavior`, the one that
  * must be swept.
  *

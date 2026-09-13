@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #66 (G97): the dialog that appears when collecting cancels on a
+ * End-to-end coverage for issue #66: the dialog that appears when collecting cancels on a
  * shared attachment must say WHY the attachment stayed put, not merely that several notes reference
  * it. The reporter's words were "allows user to identify the real reason an image is not moving".
  *

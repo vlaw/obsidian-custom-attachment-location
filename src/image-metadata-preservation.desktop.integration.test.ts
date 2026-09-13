@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #55 (G97): converting an image to JPEG re-encodes it through a
+ * End-to-end coverage for issue #55: converting an image to JPEG re-encodes it through a
  * canvas, which keeps only the pixels — so EXIF, GPS and the rest are dropped by construction. The
  * requester plots photos on a map from their EXIF geolocation, and that stops working once this plugin has
  * converted them.

@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #24 (G97 for an already-merged feature of this plugin): with
+ * End-to-end coverage for issue #24 (an already-merged feature of this plugin): with
  * `shouldSetLinkDisplayTextToAttachmentFileName` ON, generating a link to an ATTACHMENT (via the
  * patched `FileManager.generateMarkdownLink`, the sink every insert/drag/paste goes through) sets its
  * display text to the attachment base name (no extension). Notes are excluded; an explicit alias

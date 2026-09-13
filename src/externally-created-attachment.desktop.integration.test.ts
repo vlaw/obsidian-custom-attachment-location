@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for the second half of issue #59 (G97): an attachment another plugin writes
+ * End-to-end coverage for the second half of issue #59: an attachment another plugin writes
  * straight into the vault must be moved and renamed per the configured templates, once the opt-in
  * setting is on — and left exactly where it was written when the setting is off.
  *

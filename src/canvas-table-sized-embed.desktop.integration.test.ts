@@ -13,7 +13,7 @@ import {
  * emitted an UNescaped `|500`, breaking the surrounding table. The fix lives in obsidian-dev-utils
  * `applyCanvasChanges`, which restores the escaping when the original reference used `\|`.
  *
- * G97 ESCAPE HATCH — the behavioral rewrite cannot be driven to completion in the hidden-mode
+ * NOT COVERED END TO END — the behavioral rewrite cannot be driven to completion in the hidden-mode
  * headless harness. Confirmed empirically against the harness-owned real Obsidian:
  *   - Renaming the IMAGE directly does not reach canvas text-node embeds (canvases are not in the
  *     backlink cache; the obsidian-dev-utils rename handler invokes `getCanvasReferences` only when
@@ -31,7 +31,7 @@ import {
  * The fix IS covered upstream by a unit test in obsidian-dev-utils (`file-change.test.ts`: a
  * round-trip of a table-escaped sized embed `![[old.png\|500]]` -> `![[new.png\|500]]`). This suite
  * is therefore recorded as a documented, skipped behavioral test with the assertions it WOULD run
- * plus the manual repro recipe below, rather than silently omitted (G97).
+ * plus the manual repro recipe below, rather than silently omitted.
  *
  * MANUAL REPRO (real Obsidian, GUI):
  *   1. Install + enable Custom Attachment Location; set "Location for new attachments" to a relative
@@ -95,7 +95,7 @@ describe('Canvas table sized embed survives the rewrite (issue #27)', () => {
   }, 120_000);
 
   /*
-   * The behavioral rewrite assertion (skipped — see the G97 escape-hatch note above). Kept as
+   * The behavioral rewrite assertion (skipped — see the note at the top of this file). Kept as
    * executable intent: were canvas text-node embeds discoverable headlessly, this would rename the
    * target through Collect and assert the rewritten embed keeps `\|500` (never an unescaped `|500`).
    */

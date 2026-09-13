@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #57 (G97): `notePriorities` decides which of several referencing
+ * End-to-end coverage for issue #57: `notePriorities` decides which of several referencing
  * notes owns an attachment, so collecting no longer has to fall back to
  * `collectAttachmentUsedByMultipleNotesMode`.
  *

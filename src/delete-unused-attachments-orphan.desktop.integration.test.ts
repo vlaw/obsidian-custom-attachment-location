@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage (G97) for the vault-wide sweep reaching an attachment folder whose owning note
+ * End-to-end coverage for the vault-wide sweep reaching an attachment folder whose owning note
  * no longer exists.
  *
  * The scenario is the one no note-driven scan can reach. An attachment folder is visited only through the

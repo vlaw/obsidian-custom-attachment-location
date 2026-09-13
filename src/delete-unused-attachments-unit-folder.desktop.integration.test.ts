@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #72 (G97): `Delete unused attachments in entire vault` judges a
+ * End-to-end coverage for issue #72: `Delete unused attachments in entire vault` judges a
  * designated attachment unit folder as ONE attachment.
  *
  * Two units are staged in the same sweep, because each one alone would pass a test the other fails:
