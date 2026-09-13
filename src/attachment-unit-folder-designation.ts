@@ -24,7 +24,7 @@ import type { Vault } from 'obsidian';
 /**
  * The attachment-unit-folder designation published on {@link Vault.getAvailablePathForAttachments}.
  *
- * TODO(T898-P4): drop this local declaration once T897-P1 declares `checkIsAttachmentUnitFolder` on
+ * TODO: drop this local declaration once `obsidian-dev-utils` declares `checkIsAttachmentUnitFolder` on
  * `GetAvailablePathForAttachmentsFunctionExtended` in `obsidian-dev-utils` and this plugin consumes
  * that release.
  */

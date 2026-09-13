@@ -1,8 +1,8 @@
 /**
  * @file
  *
- * Produces the desktop screenshots the community-store listing needs
- * (T461-P21), driving a staged vault in a real Obsidian and writing
+ * Produces the desktop screenshots the community-store listing needs,
+ * driving a staged vault in a real Obsidian and writing
  * `images/screenshots/screenshot-desktop-N.png`.
  *
  * FIVE shots of the problem the README opens with: attachments that pile up in

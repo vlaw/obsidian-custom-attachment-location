@@ -9,7 +9,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for the two navigation commands ([[T692-P4]]). Both are resolved through the
+ * End-to-end coverage for the two navigation commands. Both are resolved through the
  * plugin's own machinery — the folder from the attachment-folder pattern, the owning note from the
  * link graph — so only a real vault with a real metadata cache proves they agree with each other.
  */

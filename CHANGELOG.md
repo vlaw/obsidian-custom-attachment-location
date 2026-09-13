@@ -67,7 +67,7 @@
 
 ## 11.8.0
 
-- style: format the locale files T573 added
+- style: format the locale files
 - feat(prompt): focus the input, name the heading, and catch foreign attachments (#59)
 
 ## 11.7.0
@@ -176,7 +176,7 @@
 - docs: standardize demo-vault README
 - docs: drop per-plugin demo-vault setup notes (bootstrap covered by ODU harness)
 - docs: unnumber demo-vault setup notes
-- Merge branch 'T93': create the Custom Attachment Location demo vault (S2)
+- docs(demo-vault): create the Custom Attachment Location demo vault
 
 ## 11.2.0
 

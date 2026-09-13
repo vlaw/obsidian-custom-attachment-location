@@ -144,7 +144,7 @@ describe('An attachment written by a plugin Obsidian itself loaded (issue #77)',
           id: pluginId,
           isDesktopOnly: false,
           minAppVersion: '0.15.0',
-          name: 'T753 Installed Writer',
+          name: 'Installed Writer',
           version: '1.0.0'
         });
 
