@@ -831,7 +831,7 @@ describe('UnusedAttachmentsRemover', () => {
   });
 
   /*
-   * The attachment-driven pass (T847). Everything here goes through the VAULT-WIDE command, because that
+   * The attachment-driven pass. Everything here goes through the VAULT-WIDE command, because that
    * is the only entry point that runs it — the per-note and per-folder scopes deliberately do not, since
    * "no note references this" is only trustworthy from a scan that read every note there is.
    */

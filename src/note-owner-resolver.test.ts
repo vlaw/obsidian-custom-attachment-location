@@ -164,7 +164,7 @@ describe('NoteOwnerResolver', () => {
       /*
        * The library's parameters are a union since 100.0.0: an app it reads the published designation
        * from, or a predicate the caller owns. This plugin still supplies the predicate - reading the
-       * published seam instead is T898-P4 - so narrowing on the member also asserts which form is passed.
+       * published seam instead is still ahead - so narrowing on the member also asserts which form is passed.
        */
       const isProbedWithPredicate = !!probeParams && 'checkIsAttachmentUnitFolder' in probeParams;
       expect(isProbedWithPredicate).toBe(true);

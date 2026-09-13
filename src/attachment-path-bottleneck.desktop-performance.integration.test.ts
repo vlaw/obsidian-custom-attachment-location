@@ -26,7 +26,7 @@ import {
 } from '../scripts/helpers/generate-performance-vault.ts';
 
 /*
- * Localizes the bulk-deletion bottleneck of [[T8-P4]]. The consumer
+ * Localizes the bulk-deletion bottleneck. The consumer
  * (`consistent-attachments-and-links`) calls the dev-utils core
  * `getAttachmentFilePath` once per attachment link per file; that core reads the WHOLE
  * binary of each attachment (`await app.vault.readBinary(...)`) before dispatching to this

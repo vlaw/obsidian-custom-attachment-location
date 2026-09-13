@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for T847 (G97): the vault-wide sweep reaching an attachment folder whose owning note
+ * End-to-end coverage (G97) for the vault-wide sweep reaching an attachment folder whose owning note
  * no longer exists.
  *
  * The scenario is the one no note-driven scan can reach. An attachment folder is visited only through the
@@ -50,7 +50,7 @@ interface ProbeResult {
   readonly settingsFound: boolean;
 }
 
-describe('Delete unused attachments in entire vault, for attachments no note owns (T847)', () => {
+describe('Delete unused attachments in entire vault, for attachments no note owns', () => {
   it('walks past an ownerless attachment folder until the mode is on, then trashes it', async () => {
     const result = await evalInObsidian({
       async callback({
