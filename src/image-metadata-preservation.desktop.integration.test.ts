@@ -9,7 +9,7 @@ import {
 /*
  * End-to-end coverage for issue #55 (G97): converting an image to JPEG re-encodes it through a
  * canvas, which keeps only the pixels — so EXIF, GPS and the rest are dropped by construction. The
- * requester plots photos on a map from their EXIF geolocation, and that stops working once OCAL has
+ * requester plots photos on a map from their EXIF geolocation, and that stops working once this plugin has
  * converted them.
  *
  * This drives the real clipboard `insertFiles` sink with a genuine, decodable JPEG carrying a known
@@ -89,7 +89,7 @@ describe('Image metadata is preserved across the JPEG conversion (issue #55)', (
         const MAKE_TAG = 0x01_0F;
         const ORIENTATION_TAG = 0x01_12;
         const ROTATED_180 = 3;
-        const MAKE_VALUE = 'OCAL';
+        const MAKE_VALUE = 'TEST';
 
         function bytesOf(text: string): number[] {
           return Array.from(text, (character) => character.codePointAt(0) ?? 0);
@@ -346,7 +346,7 @@ describe('Image metadata is preserved across the JPEG conversion (issue #55)', (
             name: `${baseName}.jpg`
           }]);
 
-          // The save runs through OCAL's saveAttachment patch; poll until the converted JPEG lands.
+          // The save runs through the plugin's saveAttachment patch; poll until the converted JPEG lands.
           let savedPath = '';
           const deadline = Date.now() + 15_000;
           while (Date.now() < deadline) {

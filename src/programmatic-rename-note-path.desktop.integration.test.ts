@@ -111,7 +111,7 @@ describe('Programmatic RenameNote resolution (Advanced Note Composer issue #259)
         }
 
         // Neither the settings nor the read-back component is exposed publicly, so both are located by
-        // Walking the plugin's component tree (same approach as the other OCAL integration tests).
+        // Walking the plugin's component tree (same approach as the other integration tests here).
         function findInPluginTree<T>(match: (record: Record<string, unknown>) => null | T): null | T {
           const block = new Set(['app', 'containerEl', 'dom', 'metadataCache', 'plugins', 'vault', 'workspace']);
           const seen = new Set<unknown>();

@@ -110,11 +110,11 @@
 ## 11.6.1
 
 - chore: update libs
-- test: un-skip the #47 and #49 reproductions, now green on ODU 89 (re #47, re #49)
+- test: un-skip the #47 and #49 reproductions, now green on obsidian-dev-utils 89 (re #47, re #49)
 - test: re #49
 - test: re #47
 - chore: update libs
-- refactor(prism): register the tokenized-string language through ODU's SyntaxHighlightingComponent
+- refactor(prism): register the tokenized-string language through obsidian-dev-utils' SyntaxHighlightingComponent
 - chore(vitest): consume the shared vitest configuration and collapse the desktop-only suites
 
 ## 11.6.0
@@ -135,7 +135,7 @@
 ## 11.4.0
 
 - docs: demo link-display-text setting (re #24)
-- test: behavioral integration tests for ODU 88.2.0 canvas/alias fixes + clipboard/link-display
+- test: behavioral integration tests for obsidian-dev-utils 88.2.0 canvas/alias fixes + clipboard/link-display
 - chore: update libs
 - fix: re #16
 - fix: re #26
@@ -174,7 +174,7 @@
 ## 11.2.1
 
 - docs: standardize demo-vault README
-- docs: drop per-plugin demo-vault setup notes (bootstrap covered by ODU harness)
+- docs: drop per-plugin demo-vault setup notes (bootstrap covered by the obsidian-dev-utils harness)
 - docs: unnumber demo-vault setup notes
 - docs(demo-vault): create the Custom Attachment Location demo vault
 
