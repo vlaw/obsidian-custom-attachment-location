@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #75 (G97): collecting from a note the priority list ranks BELOW the
+ * End-to-end coverage for issue #75: collecting from a note the priority list ranks BELOW the
  * others hands the attachment away to the winner, and used to do it in silence. The reporter asked to
  * "see the notes of higher priority that are referencing the image", so a notice must name them.
  *

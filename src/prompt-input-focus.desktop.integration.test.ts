@@ -25,12 +25,12 @@ interface OperationQueueWrapper {
 }
 
 /*
- * End-to-end coverage for the first and third halves of issue #59 (G97): the `${prompt}` modal must
+ * End-to-end coverage for the first and third halves of issue #59: the `${prompt}` modal must
  * open with its input already focused and its default value pre-selected, so typing replaces the name
  * without a click first — and its heading must say what is actually being decided.
  *
- * The modal is driven through its real DOM (fill the input, click the OK button) rather than stubbed,
- * per G97. `document.activeElement` is asserted inside the live renderer, which is the only place the
+ * The modal is driven through its real DOM (fill the input, click the OK button) rather than stubbed.
+ * `document.activeElement` is asserted inside the live renderer, which is the only place the
  * focus is real — the unit test can only observe the `focus()` call, since the mock modal never
  * attaches its content to a document.
  *

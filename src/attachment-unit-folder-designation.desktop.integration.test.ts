@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage (G97) for the attachment-unit-folder designation this plugin publishes on the
+ * End-to-end coverage for the attachment-unit-folder designation this plugin publishes on the
  * patched `Vault.getAvailablePathForAttachments`, beside `extended`.
  *
  * The reader that needs it is another plugin: Advanced Rename and Delete Handler owns the delete

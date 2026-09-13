@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #31 (G97 for an already-merged feature of this plugin): in
+ * End-to-end coverage for issue #31 (an already-merged feature of this plugin): in
  * "Attachment rename mode: Only pasted images", an image inserted through the clipboard `insertFiles`
  * sink must be renamed per the configured `generatedAttachmentFileName` pattern EVEN when its source
  * name is not `Pasted image <timestamp>` (e.g. a Windows 11 Win+Shift+S screenshot backed by a temp

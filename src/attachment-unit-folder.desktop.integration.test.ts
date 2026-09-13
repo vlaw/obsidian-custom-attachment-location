@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #56 (G97): a folder listed in `attachmentUnitFolderPaths` is one
+ * End-to-end coverage for issue #56: a folder listed in `attachmentUnitFolderPaths` is one
  * attachment. When "Collect attachments in current note" moves a link into such a folder, the whole
  * folder must travel, not just the linked file.
  *

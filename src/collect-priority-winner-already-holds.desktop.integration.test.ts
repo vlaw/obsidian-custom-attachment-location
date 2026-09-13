@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #73 (G97): collecting on a note that ALREADY holds a shared
+ * End-to-end coverage for issue #73: collecting on a note that ALREADY holds a shared
  * attachment, and that outranks the other note referencing it, must move nothing and say nothing.
  * The `multiple notes` box was reporting an ambiguity the priority list had already settled.
  *

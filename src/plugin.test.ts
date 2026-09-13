@@ -114,7 +114,7 @@ vi.mock('obsidian-dev-utils/obsidian/components/rename-delete-handler-component'
 
 // `PluginDataHandler` and `PluginEventSourceImpl` are NOT stubbed: since obsidian-dev-utils 93.2 the base
 // Builds its own settings component out of them during `onload`, and that component really calls
-// `pluginEventSource.on`, so a bare `vi.fn()` double makes the base throw before `onloadImpl` runs (G49).
+// `pluginEventSource.on`, so a bare `vi.fn()` double makes the base throw before `onloadImpl` runs.
 // --- The plugin's OWN sibling modules: collaborators added as children return a real Component; the rest are bare constructor spies. ---
 
 vi.mock('./handed-over-settings-component.ts', () => ({

@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #64 (G97): `Delete unused attachments` over the WHOLE vault, not just
+ * End-to-end coverage for issue #64: `Delete unused attachments` over the WHOLE vault, not just
  * the current note.
  *
  * The scenario is the one that makes the vault-wide scope different from running the per-note command

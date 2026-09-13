@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 /*
- * End-to-end coverage for issue #74 (G97): the dialog that appears when collecting cannot decide which
+ * End-to-end coverage for issue #74: the dialog that appears when collecting cannot decide which
  * note owns a shared attachment must list only the notes tying for the HIGHEST rank. A note the
  * priority list deliberately ranked below them cannot resolve the ambiguity, so listing it is noise -
  * the reporter's words were "allows user to only see the relevant notes to solve the ambiguity".

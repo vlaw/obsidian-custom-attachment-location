@@ -20,7 +20,7 @@ import {
  *
  * Desktop-only: the plugin is cross-platform (`isDesktopOnly: false`), but this run has no Android
  * emulator provisioned, and the delete flow is platform-agnostic vault/trash + modal DOM logic with no
- * version-sensitive Obsidian internals (see the G99 note in the tracking task). The sibling
+ * version-sensitive Obsidian internals. The sibling
  * `collect-attachments-exclusion.desktop.integration.test.ts` is desktop-only for the same reason.
  */
 
