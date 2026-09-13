@@ -36,6 +36,7 @@ import {
   captureObsidianScreenshot,
   evalInObsidian,
   labelScreenshot,
+  pollInObsidian,
   readPngDimensions
 } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
@@ -53,6 +54,19 @@ import {
 interface CollapsibleFileItem {
   collapsed?: boolean;
   setCollapsed?(this: void, isCollapsed: boolean): Promise<void>;
+}
+
+/**
+ * What one drawer attempt saw.
+ *
+ * `isOpen` is what the Node-side `until` accepts on; the other two are the facts
+ * the failure message is built from, carried out of Obsidian on every attempt so
+ * the LAST of them is still in hand when the budget runs out.
+ */
+interface DrawerAttempt {
+  collapsed: boolean;
+  display: string;
+  isOpen: boolean;
 }
 
 /**
@@ -286,10 +300,9 @@ async function buildScreenshotAttachment(): Promise<Uint8Array> {
  * @returns How many attachment embeds rendered.
  */
 async function openNote(notePath: string, shouldShowTree = true): Promise<number> {
-  return await evalInObsidian({
-    async callback({ app, lib: { waitUntil }, notePath: path, shouldShowTree: isTreeWanted }) {
+  await evalInObsidian({
+    async callback({ app, lib: { waitUntil }, notePath: path }) {
       const RENDER_TIMEOUT_IN_MILLISECONDS = 20_000;
-      const SETTLE_DELAY_IN_MILLISECONDS = 1500;
 
       const file = app.vault.getFileByPath(path);
       if (!file) {
@@ -308,87 +321,156 @@ async function openNote(notePath: string, shouldShowTree = true): Promise<number
         predicate: () => Boolean(document.querySelector('.cm-content, .markdown-preview-view')),
         timeoutInMilliseconds: RENDER_TIMEOUT_IN_MILLISECONDS
       });
+    },
+    input: { notePath },
+    vaultPath: vaultPath()
+  });
 
-      // A folder the tree has not expanded is a folder the reader cannot see, and
-      // WHERE the attachment landed is the entire story here. Expanded on every
-      // Shot rather than once, because each paste creates a new folder that
-      // Arrives collapsed.
-      //
-      // On a phone the tree lives in the left DRAWER, which is closed by default
-      // And covers the note when open — so unlike the desktop suite, this opens
-      // It for every shot except the last, where the note itself is the subject.
-      const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
+  /*
+   * On a phone the tree lives in the left DRAWER, which is closed by default and covers the
+   * note when open — so unlike the desktop suite, this opens it for every shot except the
+   * last, where the note itself is the subject.
+   *
+   * Opening a file CLOSES the drawer, and it does so asynchronously — one `expand()` in the
+   * same turn is undone a moment later, which is why this retries rather than waits. The
+   * drawer also SLIDES, so a frame taken mid-animation is a black panel with the note shoved
+   * off the right edge; checking a row is painted at a sane x is what proves the animation
+   * finished rather than started.
+   *
+   * The retry runs from NODE, one attempt per transport call. Every sleep in an attempt is
+   * unconditional, so an attempt really costs the toggle plus both settles — 5 500 ms — and
+   * six of them is 33 000 ms, past the ~30 000 ms a single transport call is capped at. Run
+   * inside one closure, as this was, the sixth attempt crossed the cap and the `Error` below
+   * could never be thrown: an exhausted retry died instead as a bare `WebDriverError: script
+   * timeout` naming only `AppiumTransport.evaluate` — the one failure the retry anticipated
+   * was the one failure it could not report.
+   */
+  if (shouldShowTree) {
+    const DRAWER_ATTEMPTS = 6;
+    const DRAWER_SETTLE_DELAY_IN_MILLISECONDS = 2500;
+    const TOGGLE_DELAY_IN_MILLISECONDS = 500;
+    const POLL_INTERVAL_IN_MILLISECONDS = 500;
+    const DRAWER_ATTEMPT_COST_IN_MILLISECONDS = TOGGLE_DELAY_IN_MILLISECONDS + 2 * DRAWER_SETTLE_DELAY_IN_MILLISECONDS;
 
-      if (isTreeWanted) {
-        // Opening a file CLOSES the drawer on a phone, and it does so
-        // Asynchronously — one `expand()` in the same turn is undone a moment
-        // Later, which is why this retries rather than waits. The drawer also
-        // SLIDES, so a frame taken mid-animation is a black panel with the note
-        // Shoved off the right edge; checking a row is painted at a sane x is
-        // What proves the animation finished rather than started.
-        const DRAWER_ATTEMPTS = 6;
-        const DRAWER_SETTLE_DELAY_IN_MILLISECONDS = 2500;
+    /*
+     * A Node-side budget, where the cap does not apply, rather than an attempt count: the
+     * deadline is checked after an unsatisfied attempt RETURNS, so 33 000 ms admits exactly
+     * six of them — the fifth ends at 29 500 ms and the sixth at 35 500 ms.
+     */
+    const DRAWER_BUDGET_IN_MILLISECONDS = DRAWER_ATTEMPTS * DRAWER_ATTEMPT_COST_IN_MILLISECONDS;
 
-        // `.tree-item-self`, not `.nav-file-title`: the tree starts fully
-        // Collapsed, so at this point every row is a FOLDER and waiting for a
-        // File row waits forever.
-        //
-        // And ALL of them, not `querySelector`'s first: Obsidian leaves earlier
-        // Renders in the document, so the first match can be a detached row that
-        // Is zero-sized no matter what the drawer does — which reads as "the
-        // Drawer never opened" while it sits open on screen.
-        function isDrawerOpen(): boolean {
-          return [...document.querySelectorAll('.nav-files-container .tree-item-self')]
-            .map((row) => row.getBoundingClientRect())
-            .some((rect) => rect.width > 0 && rect.left >= 0);
-        }
+    let lastAttempt: DrawerAttempt | undefined;
 
-        // `expand()` ONLY, and only while the drawer reports itself collapsed.
-        // Adding `revealLeaf` — the desktop reflex — leaves it shut, and calling
-        // `expand()` again on a drawer that is already sliding open toggles it
-        // Back: an eager retry loop flips it open and shut forever and never
-        // Satisfies its own predicate.
-        const TOGGLE_DELAY_IN_MILLISECONDS = 500;
+    try {
+      await pollInObsidian({
+        /*
+         * The delays travel as `input` rather than as literals inside the closure so the
+         * attempt cost above and the sleeps below are the same three numbers — and the
+         * `no-over-cap-wait-in-eval-in-obsidian` lint rule follows a destructured parameter
+         * back through `input`, so the closure is still sized at 5 500 ms rather than read as
+         * unbounded.
+         */
+        input: {
+          drawerSettleDelayInMilliseconds: DRAWER_SETTLE_DELAY_IN_MILLISECONDS,
+          toggleDelayInMilliseconds: TOGGLE_DELAY_IN_MILLISECONDS
+        },
+        intervalInMilliseconds: POLL_INTERVAL_IN_MILLISECONDS,
+        async poll({ app, drawerSettleDelayInMilliseconds, toggleDelayInMilliseconds }): Promise<DrawerAttempt> {
+          // `.tree-item-self`, not `.nav-file-title`: the tree starts fully
+          // Collapsed, so at this point every row is a FOLDER and waiting for a
+          // File row waits forever.
+          //
+          // And ALL of them, not `querySelector`'s first: Obsidian leaves earlier
+          // Renders in the document, so the first match can be a detached row that
+          // Is zero-sized no matter what the drawer does — which reads as "the
+          // Drawer never opened" while it sits open on screen.
+          function isDrawerOpen(): boolean {
+            return [...document.querySelectorAll('.nav-files-container .tree-item-self')]
+              .map((row) => row.getBoundingClientRect())
+              .some((rect) => rect.width > 0 && rect.left >= 0);
+          }
 
-        let isOpen = false;
-        for (let attempt = 0; attempt < DRAWER_ATTEMPTS && !isOpen; attempt++) {
           // COLLAPSE first, always. The drawer's `collapsed` flag and its actual
           // Visibility drift apart on a phone: after the first note is opened the
           // Split reports `collapsed === false` while the drawer element is still
           // `display: none`, and in that state `expand()` is a no-op that returns
           // Happily and shows nothing. Toggling it shut and open again is what
           // Re-runs the code that actually displays it.
+          //
+          // ONE collapse/expand pair per attempt, never two: calling `expand()`
+          // Again on a drawer that is already sliding open toggles it back, so an
+          // Eager retry flips it open and shut forever and never satisfies its own
+          // Predicate. The poll interval is what keeps the next attempt from
+          // Landing mid-slide.
           app.workspace.leftSplit.collapse();
-          await sleep(TOGGLE_DELAY_IN_MILLISECONDS);
+          await sleep(toggleDelayInMilliseconds);
           app.workspace.leftSplit.expand();
-          await sleep(DRAWER_SETTLE_DELAY_IN_MILLISECONDS);
+          await sleep(drawerSettleDelayInMilliseconds);
 
           // ONLY once the drawer is out. The mobile drawer is tabbed — files,
           // Search, bookmarks — and an open drawer showing the wrong tab lays the
           // File rows out at zero width, which looks exactly like a drawer that
           // Never opened. Revealing BEFORE expanding, though, leaves it shut.
+          const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
           if (fileExplorerLeaf) {
             await app.workspace.revealLeaf(fileExplorerLeaf);
           }
 
-          await sleep(DRAWER_SETTLE_DELAY_IN_MILLISECONDS);
-          isOpen = isDrawerOpen();
-        }
+          await sleep(drawerSettleDelayInMilliseconds);
 
-        if (!isOpen) {
           // The two facts that told the story when this failed: the split's own
           // Flag, and whether the drawer element is actually displayed. They
-          // Disagree, and that disagreement IS the bug this loop works around.
+          // Disagree, and that disagreement IS the bug this retry works around.
           const drawer = document.querySelector('.workspace-drawer.mod-left');
-          const display = drawer ? window.getComputedStyle(drawer).display : 'no-drawer';
-          throw new Error(
-            `The file drawer never finished opening. collapsed=${String(app.workspace.leftSplit.collapsed)} display=${display}`
-          );
-        }
-      } else {
-        app.workspace.leftSplit.collapse();
+
+          return {
+            collapsed: app.workspace.leftSplit.collapsed,
+            display: drawer ? window.getComputedStyle(drawer).display : 'no-drawer',
+            isOpen: isDrawerOpen()
+          };
+        },
+        timeoutInMilliseconds: DRAWER_BUDGET_IN_MILLISECONDS,
+        timeoutMessage: 'the file drawer to finish opening',
+        until(attempt: DrawerAttempt): boolean {
+          // Remembered in NODE, because the attempt that fails is no longer the one
+          // That reports: the diagnostic below is thrown out here rather than
+          // Inside Obsidian.
+          lastAttempt = attempt;
+          return attempt.isOpen;
+        },
+        vaultPath: vaultPath()
+      });
+    } catch (error) {
+      // Only a drawer that was actually polled and never opened gets the drawer's
+      // Own message; anything that failed before the first attempt returned — a
+      // Missing note, a dead transport — is reported as itself.
+      if (!lastAttempt) {
+        throw error;
       }
 
+      throw new Error(
+        `The file drawer never finished opening. collapsed=${String(lastAttempt.collapsed)} display=${lastAttempt.display}`,
+        { cause: error }
+      );
+    }
+  } else {
+    await evalInObsidian({
+      callback({ app }) {
+        app.workspace.leftSplit.collapse();
+      },
+      vaultPath: vaultPath()
+    });
+  }
+
+  return await evalInObsidian({
+    async callback({ app }) {
+      const SETTLE_DELAY_IN_MILLISECONDS = 1500;
+
+      // A folder the tree has not expanded is a folder the reader cannot see, and
+      // WHERE the attachment landed is the entire story here. Expanded on every
+      // Shot rather than once, because each paste creates a new folder that
+      // Arrives collapsed.
+      const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
       if (fileExplorerLeaf) {
         const view: unknown = fileExplorerLeaf.view;
         for (const item of Object.values((view as FileExplorerView).fileItems)) {
@@ -405,7 +487,6 @@ async function openNote(notePath: string, shouldShowTree = true): Promise<number
       return [...document.querySelectorAll('.internal-embed img, .image-embed img')]
         .filter((element) => element.getBoundingClientRect().width > 0).length;
     },
-    input: { notePath, shouldShowTree },
     vaultPath: vaultPath()
   });
 }
