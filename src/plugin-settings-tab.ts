@@ -922,6 +922,36 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       }),
       this.settingEx({
         desc: createFragment((f) => {
+          f.appendText(t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part1));
+          f.appendText(' ');
+          appendCodeBlock(f, t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part2));
+          f.appendText(' ');
+          f.appendText(t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part3));
+          f.appendText(' ');
+          appendCodeBlock(f, t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part4));
+          f.appendText(' ');
+          f.appendText(t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part5));
+          f.createEl('br');
+          f.appendText(t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part6));
+          f.appendText(' ');
+          appendCodeBlock(f, t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part7));
+          f.appendText(' ');
+          f.appendText(t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part8));
+          f.createEl('br');
+          f.appendText(t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.description.part9));
+        }),
+        name: t(($) => $.pluginSettingsTab.excludeExtensionsFromMultipleNotesCheck.name),
+        render: (setting) => {
+          setting.addMultipleText((multipleText) => {
+            this.bind({
+              propertyName: 'excludeExtensionsFromMultipleNotesCheck',
+              valueComponent: multipleText
+            });
+          });
+        }
+      }),
+      this.settingEx({
+        desc: createFragment((f) => {
           f.appendText(t(($) => $.pluginSettingsTab.excludePathsFromMultipleNotesCheck.description.part1));
           f.appendText(' ');
           appendCodeBlock(f, t(($) => $.pluginSettingsTab.excludePathsFromMultipleNotesCheck.description.part2));

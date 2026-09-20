@@ -280,6 +280,7 @@ export const defaultTranslations = {
       defaultImageSizeMustBePercentageOrPixels: 'Default image size must be in pixels or percentage',
       invalidCustomTokensCode: 'Invalid custom tokens code',
       invalidRegularExpression: 'Invalid regular expression {{regExp}}',
+      multipleNotesCheckExtensionMustNotBeAPath: 'Extension {{extension}} must not contain a path separator. List a file extension, e.g. af, not a path - paths belong in "Exclude paths from multiple notes check".',
       specialCharactersMustNotContainSlash: 'Special characters must not contain /',
       specialCharactersReplacementMustNotContainInvalidFileNamePathCharacters: 'Special character replacement must not contain invalid file name path characters.'
     }
@@ -367,6 +368,20 @@ export const defaultTranslations = {
         part4: ', etc, getting the first name available.'
       },
       name: 'Duplicate name separator'
+    },
+    excludeExtensionsFromMultipleNotesCheck: {
+      description: {
+        part1: 'Skip the multiple notes check entirely for attachments with the following file extensions, during the',
+        part2: 'Collect attachments',
+        part3: 'and',
+        part4: 'Move attachment to proper folder',
+        part5: 'commands. Use it for file types that are shared between notes on purpose, so they are collected like any other attachment instead of asking every time.',
+        part6: 'Insert each extension on a new line, with or without the leading dot. Matching ignores case, and a compound extension such as',
+        part7: 'excalidraw.md',
+        part8: 'works too.',
+        part9: 'The Delete unused attachments command is deliberately not affected: it keeps counting every note that references the attachment, so a shared file is never trashed. If the setting is empty, no attachments are exempt.'
+      },
+      name: 'Exclude extensions from multiple notes check'
     },
     excludePathsFromAttachmentCollecting: {
       description: {

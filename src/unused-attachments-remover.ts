@@ -710,6 +710,11 @@ export class UnusedAttachmentsRemover {
       // Multiple-notes-check exclusion are ignored, mirroring the Collect/Move commands, so a shared
       // Attachment is never trashed. With no scanning note, `notePath` matches no backlink and every
       // Reference counts, which is the safe way to be wrong.
+      //
+      // `excludeExtensionsFromMultipleNotesCheck` is deliberately NOT consulted here, and the inconsistency
+      // Is the point rather than an oversight. There the list means "collect it anyway"; here the same list
+      // Would mean "stop counting the notes that still reference it", and this branch TRASHES what it
+      // Judges unused - so honoring it would delete exactly the shared files the setting exists to protect.
       const relevantBacklinks = backlinks.keys().filter((backlink) => backlink !== notePath && !this.pluginSettingsComponent.settings.isExcludedFromMultipleNotesCheck(backlink));
       if (relevantBacklinks.length === 0) {
         unusedAttachments.push(candidate);
