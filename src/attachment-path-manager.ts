@@ -462,7 +462,17 @@ export class AttachmentPathManager {
   }
 
   private async getAttachmentFolderPath(substitutions: Substitutions): Promise<string> {
-    return await this.resolvePathTemplate({ isFileNamePart: false, substitutions, template: this.pluginSettingsComponent.settings.attachmentFolderPath });
+    /*
+     * Collecting has its own destination when the user gave it one (issue #78): a working vault keeps new
+     * attachments in a shared folder, while a note promoted to a portable export wants them gathered beside
+     * it. An empty template means "wherever new attachments go", exactly as it does for the collected FILE
+     * NAME in `getGeneratedAttachmentFileBaseName`, so a user who never opens this setting sees no change.
+     */
+    const settings = this.pluginSettingsComponent.settings;
+    const template = substitutions.actionContext === ActionContext.CollectAttachments
+      ? settings.collectedAttachmentFolderPath || settings.attachmentFolderPath
+      : settings.attachmentFolderPath;
+    return await this.resolvePathTemplate({ isFileNamePart: false, substitutions, template });
   }
 
   private async getCursorLineAndSequenceNumber(noteFilePath: string, oldAttachmentPathOrFile: PathOrFile): Promise<CursorLineAndSequenceNumber> {

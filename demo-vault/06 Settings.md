@@ -48,6 +48,8 @@ Open **Settings -> Community plugins -> Custom Attachment Location** to configur
   - rename attachments processed by the **Collect attachments** commands.
 - `collectedAttachmentFileName`
   - the name pattern used for collected attachments.
+- `collectedAttachmentFolderPath`
+  - the folder the **Collect attachments** commands put an attachment into (a pattern), when that is not where *new* attachments go. Empty by default, which means collecting uses `attachmentFolderPath` exactly as it always has. Set it to decouple the two destinations - a shared `_Attachments` folder while you are working on a note, and `./${noteFileName}.assets` beside the note once you collect it for export. Only the collecting commands read it; **Move attachment to proper folder** keeps using `attachmentFolderPath`, because it answers where an attachment *belongs*, which is the new-attachment location. See [05 Collect attachments](<./05 Collect attachments.md>).
 - `collectAttachmentUsedByMultipleNotesMode`
   - what to do when a collected attachment is referenced by several notes: cancel, copy, move, prompt, or skip.
 - `moveAttachmentToProperFolderUsedByMultipleNotesMode`
