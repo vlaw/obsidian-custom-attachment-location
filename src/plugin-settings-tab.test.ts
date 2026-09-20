@@ -79,8 +79,8 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 31 = 30 setting rows + the overlap banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 31;
+// 32 = 31 setting rows + the overlap banner row that rides at the top.
+const EXPECTED_ROW_COUNT = 32;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
@@ -734,6 +734,17 @@ describe('PluginSettingsTab', () => {
     component.setValue('assets/folder   ');
     await waitForAllAsyncOperations();
     expect(pluginSettingsComponent.settings.attachmentFolderPath).toBe('assets/folder');
+  });
+
+  it('should normalize and trim the collected attachment folder path when its value changes', async () => {
+    const { pluginSettingsComponent, textLikeComponents } = await createTab();
+    const component = findComponent(textLikeComponents, 'Collected attachment folder path');
+    const attachmentFolderPathBefore = pluginSettingsComponent.settings.attachmentFolderPath;
+    component.setValue('exported/folder   ');
+    await waitForAllAsyncOperations();
+    expect(pluginSettingsComponent.settings.collectedAttachmentFolderPath).toBe('exported/folder');
+    // The destination for NEW attachments is untouched: decoupling the two is the whole point of the row.
+    expect(pluginSettingsComponent.settings.attachmentFolderPath).toBe(attachmentFolderPathBefore);
   });
 
   it('should store the duplicate name separator with restored space characters', async () => {

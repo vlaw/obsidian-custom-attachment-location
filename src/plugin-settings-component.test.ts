@@ -154,6 +154,32 @@ describe('PluginSettingsComponent', () => {
       expect(result.attachmentFolderPath).toContain('Unknown token');
     });
 
+    it('should accept a valid collected attachment folder path with tokens', async () => {
+      const component = await createComponent();
+      const settings = createSettings();
+      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
+      settings.collectedAttachmentFolderPath = './${noteFileName}.assets';
+      const result = await component.validate(settings);
+      expect(result.collectedAttachmentFolderPath).toBeUndefined();
+    });
+
+    it('should accept an empty collected attachment folder path, which means the new attachment location', async () => {
+      const component = await createComponent();
+      const settings = createSettings();
+      settings.collectedAttachmentFolderPath = '';
+      const result = await component.validate(settings);
+      expect(result.collectedAttachmentFolderPath).toBeUndefined();
+    });
+
+    it('should reject a collected attachment folder path with an unknown token', async () => {
+      const component = await createComponent();
+      const settings = createSettings();
+      // eslint-disable-next-line no-template-curly-in-string -- Invalid token used on purpose.
+      settings.collectedAttachmentFolderPath = '${unknownToken}';
+      const result = await component.validate(settings);
+      expect(result.collectedAttachmentFolderPath).toContain('Unknown token');
+    });
+
     it('should accept a valid generated attachment file name with tokens', async () => {
       const component = await createComponent();
       const settings = createSettings();

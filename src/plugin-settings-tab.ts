@@ -304,6 +304,41 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       }),
       this.settingEx({
         desc: createFragment((f) => {
+          f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part1));
+          f.appendText(' ');
+          appendCodeBlock(f, t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part2));
+          f.appendText(' ');
+          f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part3));
+          f.appendText(' ');
+          appendCodeBlock(f, './');
+          f.appendText(' ');
+          f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part4));
+          f.createEl('br');
+          f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part5));
+          f.appendText(' ');
+          f.createEl('a', {
+            href: 'https://github.com/mnaoumov/obsidian-custom-attachment-location?tab=readme-ov-file#tokens',
+            text: t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part6)
+          });
+          f.appendText('.');
+          f.createEl('br');
+          f.appendText(t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.description.part7));
+        }),
+        name: t(($) => $.pluginSettingsTab.collectedAttachmentFolderPath.name),
+        render: (setting) => {
+          setting.addCodeHighlighter((codeHighlighter) => {
+            codeHighlighter.setLanguage(TOKENIZED_STRING_LANGUAGE);
+            codeHighlighter.inputEl.addClass('tokenized-string-setting-control');
+            this.bind({
+              propertyName: 'collectedAttachmentFolderPath',
+              valueComponent: codeHighlighter,
+              ...bindOptionsWithTrim
+            });
+          });
+        }
+      }),
+      this.settingEx({
+        desc: createFragment((f) => {
           f.appendText(t(($) => $.pluginSettingsTab.collectAttachmentUsedByMultipleNotesMode.description.part1));
           f.createEl('br');
           appendCodeBlock(f, t(($) => $.pluginSettings.collectAttachmentUsedByMultipleNotesMode.skip.displayText));

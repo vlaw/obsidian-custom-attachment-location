@@ -426,6 +426,12 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
         areTokensAllowed: true,
         path: value
       }));
+    // Empty is legal here and means "use `attachmentFolderPath`"; `validatePath` already passes an empty path.
+    this.registerValidator('collectedAttachmentFolderPath', async (value) =>
+      await this.validator.validatePath({
+        areTokensAllowed: true,
+        path: value
+      }));
     this.registerValidator('generatedAttachmentFileName', async (value) =>
       await this.validator.validatePath({
         areTokensAllowed: true,

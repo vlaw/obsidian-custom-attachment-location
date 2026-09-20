@@ -94,6 +94,23 @@ export class PluginSettings {
   public attachmentRenameMode: AttachmentRenameMode = AttachmentRenameMode.OnlyPastedImages;
   public collectAttachmentUsedByMultipleNotesMode: CollectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Skip;
   public collectedAttachmentFileName = '';
+
+  /**
+   * Where the `Collect attachments` commands put an attachment, when that is not where a NEW attachment goes.
+   *
+   * The folder twin of {@link collectedAttachmentFileName}, and empty means the same thing there as here:
+   * fall back to the setting that governs new attachments, so a user who never opens this sees the behavior
+   * they always had. The two destinations are decoupled for the export workflow issue #78 describes — a
+   * shared `_Attachments` folder while a note is being worked on, and a portable `./${noteFileName}.assets`
+   * beside the note once it is collected for export — which until now needed the one setting flipped before
+   * each export and flipped back afterwards.
+   *
+   * Only the collecting commands read it. `Move attachment to proper folder` deliberately keeps
+   * {@link attachmentFolderPath}: it answers where an attachment BELONGS, which is the new-attachment
+   * location by definition.
+   */
+  public collectedAttachmentFolderPath = '';
+
   public convertImagesToJpegMode: ConvertImagesToJpegMode = ConvertImagesToJpegMode.None;
   public defaultImageSize = '';
   public defaultImageSizeDimension: DefaultImageSizeDimension = DefaultImageSizeDimension.Width;

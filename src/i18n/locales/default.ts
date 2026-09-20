@@ -318,6 +318,18 @@ export const defaultTranslations = {
       },
       name: 'Collected attachment file name'
     },
+    collectedAttachmentFolderPath: {
+      description: {
+        part1: 'Where the',
+        part2: 'Collect attachments',
+        part3: 'commands put an attachment. Start with',
+        part4: 'for paths relative to parent folder of note.',
+        part5: 'See available',
+        part6: 'tokens',
+        part7: 'Leave empty to use the same folder as new attachments.'
+      },
+      name: 'Collected attachment folder path'
+    },
     convertImagesToJpegMode: {
       description: {
         part1: 'Which images to convert to JPEG:'

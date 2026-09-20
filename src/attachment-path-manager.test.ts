@@ -159,6 +159,7 @@ function createManager(): TestContext {
   const settings = castTo<PluginSettings>({
     attachmentFolderPath: 'assets',
     collectedAttachmentFileName: '',
+    collectedAttachmentFolderPath: '',
     generatedAttachmentFileName: 'generated',
     renamedAttachmentFileName: '',
     shouldRenameCollectedAttachments: false,
@@ -282,6 +283,41 @@ describe('AttachmentPathManager', () => {
         oldNoteFilePath: 'old.md'
       });
       expect(result).toBe('notes/assets');
+    });
+
+    it('should use the collected attachment folder path template for CollectAttachments', async () => {
+      context.settings.attachmentFolderPath = '_Attachments';
+      context.settings.collectedAttachmentFolderPath = './exported';
+      const result = await context.manager.getAttachmentFolderFullPathForPath({
+        actionContext: ActionContext.CollectAttachments,
+        attachmentFileName: 'img.png',
+        notePath: 'notes/note.md'
+      });
+      expect(result).toBe('notes/exported');
+    });
+
+    it('should fall back to the new attachment folder path when the collected template is empty', async () => {
+      context.settings.attachmentFolderPath = '_Attachments';
+      context.settings.collectedAttachmentFolderPath = '';
+      const result = await context.manager.getAttachmentFolderFullPathForPath({
+        actionContext: ActionContext.CollectAttachments,
+        attachmentFileName: 'img.png',
+        notePath: 'notes/note.md'
+      });
+      expect(result).toBe('_Attachments');
+    });
+
+    it('should leave every other action context on the new attachment folder path', async () => {
+      context.settings.attachmentFolderPath = '_Attachments';
+      context.settings.collectedAttachmentFolderPath = './exported';
+      for (const actionContext of [ActionContext.SaveAttachment, ActionContext.MoveAttachmentToProperFolder, ActionContext.RenameNote]) {
+        const result = await context.manager.getAttachmentFolderFullPathForPath({
+          actionContext,
+          attachmentFileName: 'img.png',
+          notePath: 'notes/note.md'
+        });
+        expect(result, `Action context '${actionContext}' should use the new attachment folder path`).toBe('_Attachments');
+      }
     });
   });
 
