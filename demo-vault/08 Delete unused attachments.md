@@ -15,7 +15,7 @@ It is deliberately careful, because it deletes your data:
 
 - It only ever touches files inside the note's own attachment folder, unless you turn on **Find attachments no note owns** (see below).
 - An attachment that is still referenced by the note is kept.
-- An attachment that is still referenced by **another** note is kept - the same shared-attachment check the **Collect attachments** command uses (`excludePathsFromMultipleNotesCheck` applies here too).
+- An attachment that is still referenced by **another** note is kept - the same shared-attachment check the **Collect attachments** command uses (`excludePathsFromMultipleNotesCheck` applies here too). `excludeExtensionsFromMultipleNotesCheck` deliberately does **not**: there it would mean "stop counting the notes that still reference this file", which is the opposite of what it does while collecting, and it would trash exactly the shared files it exists to protect.
 - A folder listed under **Attachment unit folders** is one attachment, and is judged as a whole rather than file by file - see below.
 - A confirmation dialog **before** anything happens states **how many** attachments will go, then names them - the first 50, and a count of the rest, because vault-wide the list can run to thousands and a wall of paths is not something you can weigh.
 - Files go to the **trash** (recoverable), honoring your Obsidian "Deleted files" setting.

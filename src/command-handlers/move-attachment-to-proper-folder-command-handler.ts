@@ -163,8 +163,13 @@ export class MoveAttachmentToProperFolderCommandHandler extends AbstractFileComm
     // Notes matching the configured patterns are ignored when deciding whether the attachment is used by multiple notes.
     const relevantBacklinkKeys = [...backlinks.keys()].filter((backlink) => !this.pluginSettingsComponent.settings.isExcludedFromMultipleNotesCheck(backlink));
 
+    // An attachment whose file type is declared deliberately shared never asks the question at all (issue #80).
+    // Same rule, and same reason, as the Collect attachments branch in `attachment-collector.ts`.
+    const isMultipleNotesCheckSkippedByExtension = this.pluginSettingsComponent.settings.isExtensionExcludedFromMultipleNotesCheck(attachmentFile.path);
+
     if (
-      relevantBacklinkKeys.length > 1 && !await shouldContinueWithMode(context.mode ?? this.pluginSettingsComponent.settings.moveAttachmentToProperFolderUsedByMultipleNotesMode)
+      !isMultipleNotesCheckSkippedByExtension && relevantBacklinkKeys.length > 1
+      && !await shouldContinueWithMode(context.mode ?? this.pluginSettingsComponent.settings.moveAttachmentToProperFolderUsedByMultipleNotesMode)
     ) {
       return false;
     }

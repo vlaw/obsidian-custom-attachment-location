@@ -363,7 +363,8 @@ export class AttachmentCollector {
         params.abortSignal.throwIfAborted();
 
         const relevantBacklinks = backlinks.keys().filter((backlink) => !pluginSettingsComponent.settings.isExcludedFromMultipleNotesCheck(backlink));
-        if (relevantBacklinks.length > 1) {
+
+        if (this.needsMultipleNotesHandling(attachmentMoveResult.oldAttachmentPath, relevantBacklinks.length)) {
           const backlinksSorted = relevantBacklinks.sort((a, b) => a.localeCompare(b));
 
           /*
@@ -749,6 +750,30 @@ export class AttachmentCollector {
       shouldContinueOnError: true,
       shouldShowProgressBar: true
     });
+  }
+
+  /**
+   * Whether this attachment has to go through the multiple-notes mode at all.
+   *
+   * Two independent reasons to say no, and they are different axes on purpose. The backlink count has already had
+   * the excluded NOTES filtered out of it by the caller — notes that do not count as a second referrer. This adds
+   * the other half: a file type the user has declared deliberately shared never asks the question, however many
+   * notes reference it (issue #80). Exempt, it takes the same branch a singly-referenced attachment takes —
+   * collected, with Obsidian rewriting every note that points at it.
+   *
+   * A method of its own rather than a second operand in the caller's `if`, because `collectAttachments` sits on the
+   * complexity ceiling and this keeps the reason for each half readable.
+   *
+   * @param attachmentPath - The vault-relative path of the attachment being collected.
+   * @param relevantBacklinkCount - How many notes still count as referring to it.
+   * @returns `true` when the configured multiple-notes mode should run.
+   */
+  private needsMultipleNotesHandling(attachmentPath: string, relevantBacklinkCount: number): boolean {
+    if (this.pluginSettingsComponent.settings.isExtensionExcludedFromMultipleNotesCheck(attachmentPath)) {
+      return false;
+    }
+
+    return relevantBacklinkCount > 1;
   }
 
   private async prepareAttachmentToMove(params: AttachmentCollectorPrepareAttachmentToMoveParams): Promise<AttachmentMoveResult | null> {

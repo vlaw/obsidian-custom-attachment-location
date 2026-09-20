@@ -116,6 +116,27 @@ export class PluginSettings {
   public defaultImageSizeDimension: DefaultImageSizeDimension = DefaultImageSizeDimension.Width;
   public downloadNetworkImages = false;
   public duplicateNameSeparator = ' ';
+
+  /**
+   * Attachment file types that are SHARED on purpose, so the multiple-notes check never runs for them.
+   *
+   * The file-type twin of {@link excludePathsFromMultipleNotesCheck}, which answers the other axis: that one names
+   * the NOTES that do not count as a second referrer, this one names the ATTACHMENTS that are expected to have
+   * several (issue #80 — the reporter's `.af` files, which every note in a project points at by design). Without it
+   * the only way to stop the prompt is to list every note, which is the whole vault.
+   *
+   * A plain array rather than the {@link PathSettings} pair the path lists use: an extension has nothing to
+   * prefix-match and no include half, the same reasoning as {@link otherPluginIdsForAttachmentRename}. Matching is
+   * done by {@link isExtensionExcludedFromMultipleNotesCheck}, which spells out the normalization.
+   *
+   * Read by the two commands that RELOCATE — `Collect attachments` and `Move attachment to proper folder` — and
+   * deliberately NOT by `Delete unused attachments`. There the same question is asked in the opposite polarity: the
+   * remover uses the multiple-notes exclusion to DROP notes from an attachment's backlink set, and an attachment
+   * with nothing left in that set is trashed. Honoring an extension list there would delete exactly the shared files
+   * this setting exists to leave alone, so the asymmetry is deliberate rather than an oversight.
+   */
+  public excludeExtensionsFromMultipleNotesCheck: string[] = [];
+
   // eslint-disable-next-line no-template-curly-in-string -- Valid token.
   public generatedAttachmentFileName = 'file-${date:{momentJsFormat:\'YYYYMMDDHHmmssSSS\'}}';
 
@@ -249,6 +270,40 @@ export class PluginSettings {
 
   public isExcludedFromMultipleNotesCheck(path: string): boolean {
     return this._multipleNotesCheckPaths.isPathIgnored(path);
+  }
+
+  /**
+   * Whether an attachment's file type is one of the deliberately shared ones.
+   *
+   * The whole matching rule of {@link excludeExtensionsFromMultipleNotesCheck} lives here, so there is one place
+   * that says what an entry means:
+   *
+   * - **One optional leading dot.** `af` and `.af` are the same entry, because a user types what they see in the
+   *   file name and both spellings are what they see.
+   * - **Case-insensitive on both sides.** A vault that has passed through Windows, macOS and a sync client holds
+   *   `.af`, `.AF` and `.Af` for one file type.
+   * - **A literal suffix test, not a glob.** `foo.af` matches the entry `af` because it ends with `.af`. That is a
+   *   superset of comparing only the last dotted segment, which is what lets a compound suffix be named outright —
+   *   `excalidraw.md` matches `Drawing.excalidraw.md` and nothing else. No regular-expression form: the path
+   *   setting beside it already carries `/…/` for anything more elaborate, and a closed one-word value does not
+   *   need a second vocabulary.
+   *
+   * An entry that is blank, or is nothing but dots, matches nothing — otherwise an accidental empty line in the
+   * text area would turn the check off for the entire vault.
+   *
+   * @param path - The vault-relative path of the attachment.
+   * @returns `true` when the multiple-notes check should be skipped for it.
+   */
+  public isExtensionExcludedFromMultipleNotesCheck(path: string): boolean {
+    const lowerCasePath = path.toLowerCase();
+    return this.excludeExtensionsFromMultipleNotesCheck.some((extension) => {
+      const normalizedExtension = extension.trim().replace(/^\./, '').toLowerCase();
+      if (normalizedExtension === '' || /^\.*$/.test(normalizedExtension)) {
+        return false;
+      }
+
+      return lowerCasePath.endsWith(`.${normalizedExtension}`);
+    });
   }
 
   /**

@@ -79,8 +79,8 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 32 = 31 setting rows + the overlap banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 32;
+// 33 = 32 setting rows + the overlap banner row that rides at the top.
+const EXPECTED_ROW_COUNT = 33;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
@@ -910,6 +910,14 @@ describe('PluginSettingsTab', () => {
     component.setValue(['foo/bar']);
     await waitForAllAsyncOperations();
     expect(pluginSettingsComponent.settings.excludePathsFromAttachmentCollecting).toStrictEqual(['foo/bar']);
+  });
+
+  it('should bind the multiple-notes-check extension list', async () => {
+    const { multipleTextComponents, pluginSettingsComponent } = await createTab();
+    const component = findMultipleValueComponent(multipleTextComponents, 'Exclude extensions from multiple notes check');
+    component.setValue(['af']);
+    await waitForAllAsyncOperations();
+    expect(pluginSettingsComponent.settings.excludeExtensionsFromMultipleNotesCheck).toStrictEqual(['af']);
   });
 
   it('should re-register custom tokens when the custom tokens code changes', async () => {

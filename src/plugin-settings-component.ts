@@ -460,6 +460,10 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
       });
     });
 
+    this.registerValidator('excludeExtensionsFromMultipleNotesCheck', (value): MaybeReturn<string> => {
+      return extensionsValidator(value);
+    });
+
     this.registerValidator('excludePathsFromMultipleNotesCheck', (value): MaybeReturn<string> => {
       return pathsValidator(value);
     });
@@ -497,6 +501,26 @@ function addDateTimeFormat(params: AddDateTimeFormatParams): string {
 
 function commentOut($string: string): string {
   return $string.replaceAll(/^/gm, '// ');
+}
+
+/**
+ * Rejects the one mistake the extension list cannot absorb: a PATH typed into it.
+ *
+ * Everything else an entry can be is already handled silently by
+ * {@link PluginSettings.isExtensionExcludedFromMultipleNotesCheck} - a leading dot, any casing, a blank line. A path
+ * is different, because it would simply never match anything and the user would be left believing the setting is
+ * broken. The two settings sit next to each other in the tab and the other one is the one that wants paths, so this
+ * is the mistake worth naming.
+ *
+ * @param extensions - The raw entries as typed.
+ * @returns The validation message, or nothing when every entry is usable.
+ */
+function extensionsValidator(extensions: string[]): MaybeReturn<string> {
+  for (const extension of extensions) {
+    if (/[/\\]/.test(extension)) {
+      return t(($) => $.pluginSettingsManager.validation.multipleNotesCheckExtensionMustNotBeAPath, { extension });
+    }
+  }
 }
 
 function pathsValidator(paths: string[]): MaybeReturn<string> {

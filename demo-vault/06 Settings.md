@@ -60,6 +60,8 @@ Open **Settings -> Community plugins -> Custom Attachment Location** to configur
   - paths ignored by the collecting commands.
 - `excludePathsFromMultipleNotesCheck`
   - notes on these paths are ignored when deciding whether a collected attachment is used by multiple notes, so a shared embed (e.g. an `.excalidraw` drawing) does not block collecting.
+- `excludeExtensionsFromMultipleNotesCheck`
+  - the same question from the other side: attachments with these file extensions skip the multiple-notes check entirely, however many notes reference them. Use it for file types that are shared between notes on purpose. Write one extension per line, with or without the leading dot; matching ignores case, and a compound extension such as `excalidraw.md` works. It is read by **Collect attachments** and **Move attachment to proper folder**, and deliberately not by **Delete unused attachments** - see [08 Delete unused attachments](<./08 Delete unused attachments.md>).
 - `orphanAttachmentScanMode`
   - whether **Delete unused attachments in entire vault** also looks for attachments no note owns at all — the case where a note was deleted and its attachment folder was left behind, which nothing leads to any more. `None` (default), `Listed paths`, or `Entire vault`. Applies to the whole-vault command only. See [08 Delete unused attachments](<./08 Delete unused attachments.md>).
 - `orphanAttachmentScanPaths`

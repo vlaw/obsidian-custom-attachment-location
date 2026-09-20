@@ -138,6 +138,7 @@ const mockUpdateLink = vi.mocked(updateLink);
 const mockGetProperAttachmentPath = vi.fn<AttachmentPathManager['getProperAttachmentPath']>();
 const mockGetSequenceNumberMap = vi.fn<AttachmentPathManager['getSequenceNumberMap']>();
 const mockIsExcludedFromMultipleNotesCheck = vi.fn<PluginSettings['isExcludedFromMultipleNotesCheck']>();
+const mockIsExtensionExcludedFromMultipleNotesCheck = vi.fn<PluginSettings['isExtensionExcludedFromMultipleNotesCheck']>();
 const mockIsNoteEx = vi.fn<PluginSettingsComponent['isNoteEx']>();
 const mockIsPathIgnored = vi.fn<HandedOverSettingsComponent['isPathIgnored']>();
 
@@ -195,6 +196,7 @@ describe('MoveAttachmentToProperFolderCommandHandler', () => {
     mockGetSequenceNumberMap.mockResolvedValue(new Map());
     mockIsPathIgnored.mockReturnValue(false);
     mockIsExcludedFromMultipleNotesCheck.mockReturnValue(false);
+    mockIsExtensionExcludedFromMultipleNotesCheck.mockReturnValue(false);
     mode = MoveAttachmentToProperFolderUsedByMultipleNotesMode.CopyAll;
     combinedAbortSignal = new AbortController().signal;
     mockAbortSignalAny.mockReturnValue(combinedAbortSignal);
@@ -209,6 +211,7 @@ describe('MoveAttachmentToProperFolderCommandHandler', () => {
       isNoteEx: mockIsNoteEx,
       settings: strictProxy<PluginSettings>({
         isExcludedFromMultipleNotesCheck: mockIsExcludedFromMultipleNotesCheck,
+        isExtensionExcludedFromMultipleNotesCheck: mockIsExtensionExcludedFromMultipleNotesCheck,
         get moveAttachmentToProperFolderUsedByMultipleNotesMode(): MoveAttachmentToProperFolderUsedByMultipleNotesMode {
           return mode;
         }
@@ -577,6 +580,30 @@ describe('MoveAttachmentToProperFolderCommandHandler', () => {
       await castTo<TestableHandler>(handler).executeAbstractFiles([attachment]);
 
       expect(mockSelectMode).toHaveBeenCalledExactlyOnceWith({ app, attachmentPath: 'attachment.png', backlinks: ['note1.md', 'note2.md'], isCancelMode: true });
+    });
+
+    it('should not trip the multiple-notes handling for an attachment whose file type is exempt', async () => {
+      // Issue #80: the extension list exempts the ATTACHMENT, so two genuine notes never reach Cancel.
+      const attachment = createFile('attachment.af');
+      mockIsFile.mockReturnValue(true);
+      mockIsFolder.mockReturnValue(false);
+      mockIsNoteEx.mockReturnValue(false);
+      mode = MoveAttachmentToProperFolderUsedByMultipleNotesMode.Cancel;
+      mockIsExtensionExcludedFromMultipleNotesCheck.mockImplementation((path) => path === 'attachment.af');
+      mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks(
+        new Map([
+          ['note1.md', [createReference('[[a]]')]],
+          ['note2.md', [createReference('[[a]]')]]
+        ])
+      ));
+      mockLoop.mockImplementation(async (params) => {
+        await castTo<LoopParams>(params).processItem(attachment);
+      });
+
+      await castTo<TestableHandler>(handler).executeAbstractFiles([attachment]);
+
+      expect(mockSelectMode).not.toHaveBeenCalled();
+      expect(mockIsExtensionExcludedFromMultipleNotesCheck).toHaveBeenCalledWith('attachment.af');
     });
 
     it('should not re-prompt for Cancel mode when settings default is not Cancel', async () => {

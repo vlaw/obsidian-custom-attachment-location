@@ -213,6 +213,32 @@ describe('PluginSettingsComponent', () => {
     });
   });
 
+  describe('excludeExtensionsFromMultipleNotesCheck validator', () => {
+    it('should accept extensions in every spelling the matcher understands', async () => {
+      const component = await createComponent();
+      const settings = createSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['af', '.PSD', 'excalidraw.md', ''];
+      const result = await component.validate(settings);
+      expect(result.excludeExtensionsFromMultipleNotesCheck).toBeUndefined();
+    });
+
+    it('should reject a path typed into the extension list, which would silently match nothing', async () => {
+      const component = await createComponent();
+      const settings = createSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['shared/project.af'];
+      const result = await component.validate(settings);
+      expect(result.excludeExtensionsFromMultipleNotesCheck).toContain('must not contain a path separator');
+    });
+
+    it('should reject a backslash path too, which is what a Windows user pastes', async () => {
+      const component = await createComponent();
+      const settings = createSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = [String.raw`shared\project.af`];
+      const result = await component.validate(settings);
+      expect(result.excludeExtensionsFromMultipleNotesCheck).toContain('must not contain a path separator');
+    });
+  });
+
   describe('specialCharactersReplacement validator', () => {
     it('should accept a replacement without invalid characters', async () => {
       const component = await createComponent();

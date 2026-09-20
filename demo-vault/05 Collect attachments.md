@@ -21,7 +21,7 @@ There is also **Move attachment to proper folder**, which relocates a single att
 2. Change **Location for new attachments** in the settings to something new.
 3. Run **Collect attachments in entire vault** and watch the existing attachments move to match the new pattern.
 
-Relevant settings: `shouldRenameCollectedAttachments`, `collectedAttachmentFileName`, `collectAttachmentUsedByMultipleNotesMode`, and `moveAttachmentToProperFolderUsedByMultipleNotesMode` control how collecting handles renaming and attachments shared by several notes; `excludePathsFromMultipleNotesCheck` lets you ignore certain notes (e.g. `.excalidraw` drawings) from that shared-attachment check. All keys are explained in [06 Settings](<./06 Settings.md>).
+Relevant settings: `shouldRenameCollectedAttachments`, `collectedAttachmentFileName`, `collectAttachmentUsedByMultipleNotesMode`, and `moveAttachmentToProperFolderUsedByMultipleNotesMode` control how collecting handles renaming and attachments shared by several notes; `excludePathsFromMultipleNotesCheck` lets you ignore certain notes (e.g. `.excalidraw` drawings) from that shared-attachment check, and `excludeExtensionsFromMultipleNotesCheck` exempts whole attachment file types from it. All keys are explained in [06 Settings](<./06 Settings.md>).
 
 ## A separate destination for collected attachments
 
@@ -105,3 +105,19 @@ Five things worth knowing:
 4. Run it on the *drawing* - the image lands in the markdown note's folder as before, and a notice now names that note, with a link to open it, so you can see who really owns the image.
 5. Run it a second time on the markdown note - the image is already in its folder, so nothing moves and nothing is reported.
 6. Embed the same image in a *second* markdown note and run it again - the two markdown notes now tie, so the dialog appears and names those two. The drawing, which the list ranked below them, is not on it.
+
+## When a whole file type is shared on purpose
+
+Some file types are shared between notes by design, and for those the question above is not worth asking at all. List their extensions under **Exclude extensions from multiple notes check** (`excludeExtensionsFromMultipleNotesCheck`) and the check never runs for them: they are collected like any singly-referenced attachment, with Obsidian rewriting every note that points at them.
+
+- One extension per line, with or without the leading dot - `af` and `.af` are the same entry.
+- Matching ignores case, so one line covers `.af`, `.AF` and `.Af`.
+- A compound extension works too: `excalidraw.md` matches `Drawing.excalidraw.md` and nothing else.
+
+This is the mirror image of `excludePathsFromMultipleNotesCheck`. That one names the **notes** that do not count as a second referrer; this one names the **attachments** that are expected to have several. It is read by **Collect attachments** and **Move attachment to proper folder**. **Delete unused attachments deliberately ignores it** - there the same list would mean "stop counting the notes that still reference this file", which would trash exactly the shared files the setting exists to protect. See [08 Delete unused attachments](<./08 Delete unused attachments.md>).
+
+### Try it
+
+1. Embed the same file from two ordinary notes and run **Collect attachments in current note** with the mode set to **Skip** - nothing moves.
+2. Add that file's extension to **Exclude extensions from multiple notes check** and repeat with a fresh copy - it moves into the note's attachment folder, and the other note's link follows it.
+3. Repeat with a file of a *different* type - it is skipped again, so the list exempts the types you named rather than switching the check off.

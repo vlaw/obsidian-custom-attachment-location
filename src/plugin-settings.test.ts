@@ -35,6 +35,7 @@ describe('PluginSettings', () => {
       expect(settings.timeoutInSeconds).toBe(5);
       expect(settings.customTokensStr).toBe('');
       expect(settings.excludePathsFromAttachmentCollecting).toStrictEqual([]);
+      expect(settings.excludeExtensionsFromMultipleNotesCheck).toStrictEqual([]);
       expect(settings.excludePathsFromMultipleNotesCheck).toStrictEqual([]);
       expect(settings.attachmentUnitFolderPaths).toStrictEqual([]);
       expect(settings.renameAttachmentsCreatedByOtherPluginsMode).toBe(RenameAttachmentsCreatedByOtherPluginsMode.None);
@@ -240,6 +241,66 @@ describe('PluginSettings', () => {
       settings.excludePathsFromMultipleNotesCheck = [String.raw`/\.excalidraw\.md$/`];
       expect(settings.isExcludedFromMultipleNotesCheck('drawings/diagram.excalidraw.md')).toBe(true);
       expect(settings.isExcludedFromMultipleNotesCheck('notes/note.md')).toBe(false);
+    });
+  });
+
+  describe('isExtensionExcludedFromMultipleNotesCheck', () => {
+    it('should exempt nothing while the list is empty', () => {
+      const settings = new PluginSettings();
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(false);
+    });
+
+    it('should accept an entry with or without the leading dot', () => {
+      const bare = new PluginSettings();
+      bare.excludeExtensionsFromMultipleNotesCheck = ['af'];
+      const dotted = new PluginSettings();
+      dotted.excludeExtensionsFromMultipleNotesCheck = ['.af'];
+      expect(bare.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(true);
+      expect(dotted.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(true);
+    });
+
+    it('should ignore case on both sides', () => {
+      const settings = new PluginSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['.AF'];
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(true);
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/PROJECT.Af')).toBe(true);
+    });
+
+    it('should tolerate the stray whitespace a pasted list carries', () => {
+      const settings = new PluginSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['  af  '];
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(true);
+    });
+
+    it('should match the whole dotted segment rather than any suffix of it', () => {
+      const settings = new PluginSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['af'];
+      // `.gif` ends with `f` and with `if`, and neither is the extension `af`.
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/picture.gif')).toBe(false);
+      // A file merely NAMED `af`, with a different extension, is not an `.af` file.
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/af.png')).toBe(false);
+    });
+
+    it('should let a compound extension be named outright', () => {
+      const settings = new PluginSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['excalidraw.md'];
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('drawings/diagram.excalidraw.md')).toBe(true);
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('notes/note.md')).toBe(false);
+    });
+
+    it('should exempt an attachment matching any one of several entries', () => {
+      const settings = new PluginSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['af', '.psd'];
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(true);
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/artwork.psd')).toBe(true);
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/photo.png')).toBe(false);
+    });
+
+    it('should exempt nothing for a blank or dots-only entry, so a stray line cannot disable the check', () => {
+      const settings = new PluginSettings();
+      settings.excludeExtensionsFromMultipleNotesCheck = ['', ' ', '.', '..'];
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/project.af')).toBe(false);
+      expect(settings.isExtensionExcludedFromMultipleNotesCheck('shared/photo.png')).toBe(false);
     });
   });
 });

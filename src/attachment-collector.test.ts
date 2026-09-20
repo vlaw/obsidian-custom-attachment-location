@@ -117,6 +117,7 @@ interface SettingsLike {
   isAttachmentUnitFolder(path: string): boolean;
   isExcludedFromAttachmentCollecting(path: string): boolean;
   isExcludedFromMultipleNotesCheck(path: string): boolean;
+  isExtensionExcludedFromMultipleNotesCheck(path: string): boolean;
   isPathIgnored(path: string): boolean;
   notePriorities: readonly string[];
   shouldSkipCollectingAttachmentsReferencedByRawPath: boolean;
@@ -348,6 +349,7 @@ describe('AttachmentCollector', () => {
       isAttachmentUnitFolder: vi.fn<(path: string) => boolean>().mockReturnValue(false),
       isExcludedFromAttachmentCollecting: vi.fn<(path: string) => boolean>().mockReturnValue(false),
       isExcludedFromMultipleNotesCheck: vi.fn<(path: string) => boolean>().mockReturnValue(false),
+      isExtensionExcludedFromMultipleNotesCheck: vi.fn<(path: string) => boolean>().mockReturnValue(false),
       isPathIgnored: vi.fn<(path: string) => boolean>().mockReturnValue(false),
       notePriorities: [],
       shouldSkipCollectingAttachmentsReferencedByRawPath: false
@@ -1130,6 +1132,46 @@ describe('AttachmentCollector', () => {
           isCancelMode: true,
           noPriorityWinnerReason: NoPriorityWinnerReason.EmptyList
         });
+      });
+
+      it('should collect an attachment whose file type is exempt, however many notes reference it', async () => {
+        // Issue #80: the point of the extension list is that a deliberately shared file type never asks the
+        // Question at all, so the configured Cancel is never reached and the attachment moves like any other.
+        settings.collectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Cancel;
+        mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks(['note.md', 'other.md', 'third.md']));
+        vi.mocked(settings.isExtensionExcludedFromMultipleNotesCheck).mockImplementation((path) => path === 'img.png');
+        mockRenameSafe.mockResolvedValue('attachments/img.png');
+
+        await runSingleFile(note);
+
+        expect(mockSelectMode).not.toHaveBeenCalled();
+        expect(errorSpy).not.toHaveBeenCalled();
+        expect(mockRenameSafe).toHaveBeenCalledWith({
+          app,
+          newPath: 'attachments/img.png',
+          oldPathOrAbstractFile: 'img.png'
+        });
+      });
+
+      it('should ask about an attachment whose file type is NOT exempt, so the list is not a blanket switch', async () => {
+        settings.collectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Cancel;
+        vi.mocked(settings.isExtensionExcludedFromMultipleNotesCheck).mockImplementation((path) => path === 'other-file.af');
+
+        await runSingleFile(note);
+
+        expect(mockSelectMode).toHaveBeenCalledTimes(1);
+      });
+
+      it('should judge the exemption by the ATTACHMENT path, not by any of the referencing notes', async () => {
+        // The two axes are easy to conflate, and conflating them here would exempt every attachment of a
+        // Note that happens to share the listed suffix.
+        settings.collectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Cancel;
+
+        await runSingleFile(note);
+
+        expect(vi.mocked(settings.isExtensionExcludedFromMultipleNotesCheck)).toHaveBeenCalledWith('img.png');
+        expect(vi.mocked(settings.isExtensionExcludedFromMultipleNotesCheck)).not.toHaveBeenCalledWith('note.md');
+        expect(vi.mocked(settings.isExtensionExcludedFromMultipleNotesCheck)).not.toHaveBeenCalledWith('other.md');
       });
     });
 
