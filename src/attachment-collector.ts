@@ -70,7 +70,6 @@ import type { HandedOverSettingsComponent } from './handed-over-settings-compone
 import type { NetworkImageDownloader } from './network-image-downloader.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
-import { checkIsAttachmentUnitFolder } from './attachment-unit-folder-designation.ts';
 import { selectMode } from './modals/collect-attachment-used-by-multiple-notes-modal.ts';
 import { NoteOwnerResolver } from './note-owner-resolver.ts';
 import { CollectAttachmentUsedByMultipleNotesMode } from './plugin-settings.ts';
@@ -830,12 +829,8 @@ export class AttachmentCollector {
        * by one and torn apart by the other.
        */
       unitFolderPath: findAttachmentUnitFolderPath({
-        attachmentPath: oldAttachmentFile.path,
-        checkIsAttachmentUnitFolder: (folderPath) =>
-          checkIsAttachmentUnitFolder({
-            folderPath,
-            vault: this.app.vault
-          })
+        app: this.app,
+        attachmentPath: oldAttachmentFile.path
       })
     };
   }

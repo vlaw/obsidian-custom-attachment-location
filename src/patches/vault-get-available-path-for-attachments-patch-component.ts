@@ -1,11 +1,11 @@
 import type { Vault } from 'obsidian';
+import type { GetAvailablePathForAttachmentsFunctionExtended } from 'obsidian-dev-utils/obsidian/attachment-path';
 
 import { AttachmentPathContext } from 'obsidian-dev-utils/obsidian/attachment-path';
 import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
 import { makeFileName } from 'obsidian-dev-utils/path';
 
 import type { AttachmentPathManager } from '../attachment-path-manager.ts';
-import type { AttachmentUnitFolderDesignation } from '../attachment-unit-folder-designation.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 interface VaultGetAvailablePathForAttachmentsPatchComponentConstructorParams {
@@ -64,15 +64,17 @@ export class VaultGetAvailablePathForAttachmentsPatchComponent extends MonkeyAro
          * kind of question — what this plugin's attachment policy says — for a reader that must not have
          * to know which plugin is answering. The delete interception needs it to keep a designated
          * folder whole (issue #70), and it moved to another plugin in 12.0.0.
+         *
+         * `obsidian-dev-utils` declares both members, so annotating the assembled method with its
+         * interface is what keeps this publisher and every reader — this plugin's own collecting and
+         * deleting commands included — agreeing on one shape instead of on two copies of it.
          */
-        const designation: Required<AttachmentUnitFolderDesignation> = {
-          checkIsAttachmentUnitFolder: (folderPath) => this.pluginSettingsComponent.settings.isAttachmentUnitFolder(folderPath)
-        };
-
-        return Object.assign(patchedMethod, {
-          ...designation,
+        const extendedMethod: GetAvailablePathForAttachmentsFunctionExtended = Object.assign(patchedMethod, {
+          checkIsAttachmentUnitFolder: (folderPath: string) => this.pluginSettingsComponent.settings.isAttachmentUnitFolder(folderPath),
           extended: this.attachmentPathManager.getAvailablePathForAttachments.bind(this.attachmentPathManager)
         });
+
+        return extendedMethod;
       }
     });
   }

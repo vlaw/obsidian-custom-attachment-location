@@ -40,7 +40,6 @@ import type { AttachmentPathManager } from './attachment-path-manager.ts';
 import type { HandedOverSettingsComponent } from './handed-over-settings-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
-import { checkIsAttachmentUnitFolder } from './attachment-unit-folder-designation.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
 // The note's attachment folder path template rarely depends on the attachment file name (the default
@@ -560,12 +559,8 @@ export class UnusedAttachmentsRemover {
    */
   private findUnitFolderPath(attachmentPath: string): null | string {
     return findAttachmentUnitFolderPath({
-      attachmentPath,
-      checkIsAttachmentUnitFolder: (folderPath) =>
-        checkIsAttachmentUnitFolder({
-          folderPath,
-          vault: this.app.vault
-        })
+      app: this.app,
+      attachmentPath
     });
   }
 

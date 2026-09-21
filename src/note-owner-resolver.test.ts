@@ -152,29 +152,22 @@ describe('NoteOwnerResolver', () => {
       expect(mockGetBacklinksForFileSafe).toHaveBeenCalledTimes(2);
     });
 
-    it('should answer the unit-folder probe from the settings', async () => {
-      // `findAttachmentUnitFolderPath` is mocked, so the real implementation never calls the predicate.
-      // Drive it directly - it is the only thing binding the unit-folder probe to the settings.
+    it('should answer the unit-folder probe from the published designation', async () => {
       mockFindAttachmentUnitFolderPath.mockReturnValue(null);
       await resolver.findCandidateNotePaths(createFile('page_files/style.css'));
 
-      const probeParams = mockFindAttachmentUnitFolderPath.mock.calls[0]?.[0];
-      expect(probeParams?.attachmentPath).toBe('page_files/style.css');
-
       /*
        * The library's parameters are a union since 100.0.0: an app it reads the published designation
-       * from, or a predicate the caller owns. This plugin still supplies the predicate - reading the
-       * published seam instead is still ahead - so narrowing on the member also asserts which form is passed.
+       * from, or a predicate the caller owns. This plugin passes the app, so that this resolver, the
+       * collecting commands and the plugin owning the delete interception all read ONE answer - the one
+       * the patch component published. Asserting the whole bag is what pins down which form is passed:
+       * an added `checkIsAttachmentUnitFolder` would be a regression to the caller-owned predicate.
        */
-      const isProbedWithPredicate = !!probeParams && 'checkIsAttachmentUnitFolder' in probeParams;
-      expect(isProbedWithPredicate).toBe(true);
-      if (!isProbedWithPredicate) {
-        return;
-      }
-
-      settings.isAttachmentUnitFolder.mockReturnValue(true);
-      expect(probeParams.checkIsAttachmentUnitFolder('page_files')).toBe(true);
-      expect(settings.isAttachmentUnitFolder).toHaveBeenCalledExactlyOnceWith('page_files');
+      expect(mockFindAttachmentUnitFolderPath).toHaveBeenCalledExactlyOnceWith({
+        app,
+        attachmentPath: 'page_files/style.css'
+      });
+      expect(settings.isAttachmentUnitFolder).not.toHaveBeenCalled();
     });
 
     it('should ignore a unit folder that does not exist', async () => {

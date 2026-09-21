@@ -6,6 +6,7 @@ import type {
   TFile,
   TFolder
 } from 'obsidian';
+import type { GetAvailablePathForAttachmentsFunctionExtended } from 'obsidian-dev-utils/obsidian/attachment-path';
 import type { AbortSignalComponent } from 'obsidian-dev-utils/obsidian/components/abort-signal-component';
 import type { CachedMetadataEx } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import type { CanvasReference } from 'obsidian-dev-utils/obsidian/reference';
@@ -51,7 +52,6 @@ import {
 
 import type { HandedOverSettings } from './advanced-rename-and-delete-handler.ts';
 import type { AttachmentPathManager } from './attachment-path-manager.ts';
-import type { AttachmentUnitFolderDesignation } from './attachment-unit-folder-designation.ts';
 import type { HandedOverSettingsComponent } from './handed-over-settings-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
@@ -158,7 +158,7 @@ function createFile(path: string): TFile {
  * @returns The patched method carrying the designation.
  */
 function createGetAvailablePathForAttachments(settingsLike: SettingsLike): App['vault']['getAvailablePathForAttachments'] {
-  const designation: Required<AttachmentUnitFolderDesignation> = {
+  const designation: Pick<Required<GetAvailablePathForAttachmentsFunctionExtended>, 'checkIsAttachmentUnitFolder'> = {
     checkIsAttachmentUnitFolder: (folderPath) => settingsLike.isAttachmentUnitFolder(folderPath)
   };
   return castTo<App['vault']['getAvailablePathForAttachments']>(Object.assign(vi.fn(), designation));
