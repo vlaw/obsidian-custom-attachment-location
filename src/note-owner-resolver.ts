@@ -177,10 +177,22 @@ export class NoteOwnerResolver {
     }
   }
 
+  /**
+   * Collects the other members of the attachment unit folder the attachment belongs to.
+   *
+   * The unit is read back through the designation this plugin PUBLISHES on the patched
+   * `Vault.getAvailablePathForAttachments`, not straight off the settings, so this resolver, the
+   * collecting commands, the unused-attachment sweep and the plugin that owns the delete interception
+   * all decide from one answer. Two of them deciding separately what a single attachment is would
+   * leave a folder kept whole by one and torn apart by another.
+   *
+   * @param attachmentFile - The attachment.
+   * @returns The sibling members' vault-relative paths, empty when the attachment belongs to no unit.
+   */
   private findUnitFolderSiblingPaths(attachmentFile: TFile): string[] {
     const unitFolderPath = findAttachmentUnitFolderPath({
-      attachmentPath: attachmentFile.path,
-      checkIsAttachmentUnitFolder: (folderPath) => this.pluginSettingsComponent.settings.isAttachmentUnitFolder(folderPath)
+      app: this.app,
+      attachmentPath: attachmentFile.path
     });
 
     if (unitFolderPath === null) {

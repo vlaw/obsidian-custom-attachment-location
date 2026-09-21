@@ -1,7 +1,13 @@
-import type { Vault as VaultOriginal } from 'obsidian';
+import type {
+  App as AppOriginal,
+  Vault as VaultOriginal
+} from 'obsidian';
 
 import { castTo } from 'obsidian-dev-utils/object-utils';
-import { AttachmentPathContext } from 'obsidian-dev-utils/obsidian/attachment-path';
+import {
+  AttachmentPathContext,
+  getCheckIsAttachmentUnitFolderFunction
+} from 'obsidian-dev-utils/obsidian/attachment-path';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
@@ -16,7 +22,6 @@ import type { AttachmentPathManager } from '../attachment-path-manager.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 import type { PluginSettings } from '../plugin-settings.ts';
 
-import { checkIsAttachmentUnitFolder } from '../attachment-unit-folder-designation.ts';
 import { VaultGetAvailablePathForAttachmentsPatchComponent } from './vault-get-available-path-for-attachments-patch-component.ts';
 
 interface PatchedMethodWithExtended {
@@ -28,15 +33,28 @@ interface SettingsLike {
 }
 
 describe('VaultGetAvailablePathForAttachmentsPatchComponent', () => {
+  let app: AppOriginal;
   let vault: VaultOriginal;
   let attachmentPathManager: AttachmentPathManager;
   let originalMethod: ReturnType<typeof vi.fn>;
   let pluginSettingsComponent: PluginSettingsComponent;
   let settings: SettingsLike;
 
+  /**
+   * Reads the designation back the way any consumer does — through the library, off the vault.
+   *
+   * @param folderPath - The vault-relative path of the folder.
+   * @returns `true` when the folder is designated, `false` when it is not and when nobody published a
+   * designation at all.
+   */
+  function checkIsAttachmentUnitFolder(folderPath: string): boolean {
+    return getCheckIsAttachmentUnitFolderFunction(app)?.(folderPath) ?? false;
+  }
+
   beforeEach(() => {
-    const app = App.createConfigured__();
-    vault = app.vault.asOriginalType2__();
+    const appMock = App.createConfigured__();
+    app = appMock.asOriginalType__();
+    vault = appMock.vault.asOriginalType2__();
     originalMethod = vi.fn().mockResolvedValue('/original/attachment/path');
     Object.defineProperty(vault, 'getAvailablePathForAttachments', {
       configurable: true,
@@ -112,14 +130,8 @@ describe('VaultGetAvailablePathForAttachmentsPatchComponent', () => {
     const component = createComponent();
     component.load();
 
-    expect(checkIsAttachmentUnitFolder({
-      folderPath: 'Materials/page_files',
-      vault
-    })).toBe(true);
-    expect(checkIsAttachmentUnitFolder({
-      folderPath: 'Materials',
-      vault
-    })).toBe(false);
+    expect(checkIsAttachmentUnitFolder('Materials/page_files')).toBe(true);
+    expect(checkIsAttachmentUnitFolder('Materials')).toBe(false);
   });
 
   it('should answer no designation before the patch is installed', () => {
@@ -127,9 +139,6 @@ describe('VaultGetAvailablePathForAttachmentsPatchComponent', () => {
      * A reader that runs against a vault no attachment-location plugin has patched — the other plugin
      * installed on its own, or this one still loading — gets `false`, not a crash.
      */
-    expect(checkIsAttachmentUnitFolder({
-      folderPath: 'Materials/page_files',
-      vault
-    })).toBe(false);
+    expect(checkIsAttachmentUnitFolder('Materials/page_files')).toBe(false);
   });
 });
