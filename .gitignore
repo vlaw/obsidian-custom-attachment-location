@@ -30,3 +30,7 @@ dist
 coverage
 
 .cache
+.pi
+
+# AI coding-agent skill definitions and helper scripts — local tooling, not part of the project
+.agents
