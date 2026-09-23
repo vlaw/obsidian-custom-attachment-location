@@ -31,6 +31,7 @@ import { FrontmatterToken } from './tokens/frontmatter-token.ts';
 import { GeneratedAttachmentFileNameToken } from './tokens/generated-attachment-file-name-token.ts';
 import { GeneratedAttachmentFilePathToken } from './tokens/generated-attachment-file-path-token.ts';
 import { HeadingToken } from './tokens/heading-token.ts';
+import { Md5Token } from './tokens/md5-token.ts';
 import { NoteFileCreationDateToken } from './tokens/note-file-creation-date-token.ts';
 import { NoteFileModificationDateToken } from './tokens/note-file-modification-date-token.ts';
 import { NoteFileNameToken } from './tokens/note-file-name-token.ts';
@@ -149,6 +150,7 @@ export class Substitutions {
     this.registerToken(new GeneratedAttachmentFileNameToken());
     this.registerToken(new GeneratedAttachmentFilePathToken());
     this.registerToken(new HeadingToken());
+    this.registerToken(new Md5Token());
     this.registerToken(new NoteFileCreationDateToken());
     this.registerToken(new NoteFileModificationDateToken());
     this.registerToken(new NoteFileNameToken());
