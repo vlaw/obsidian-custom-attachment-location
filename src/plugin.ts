@@ -5,6 +5,7 @@ import type {
   PluginGateComponent
 } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
+import type { PluginApiDeclaration } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
 
 import { Component } from 'obsidian';
 import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-demo-vault-command-handler';
@@ -52,6 +53,11 @@ import { MarkdownUrlMap } from './markdown-url-map.ts';
 import { NetworkImageDownloader } from './network-image-downloader.ts';
 import { NoteOwnerResolver } from './note-owner-resolver.ts';
 import { AppSaveAttachmentPatchComponent } from './patches/app-save-attachment-patch-component.ts';
+import { PluginApiImpl } from './plugin-api-impl.ts';
+import {
+  PLUGIN_API_CONTRACT,
+  PLUGIN_API_VERSION
+} from './plugin-api.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { TokenValidator } from './token-validator.ts';
@@ -60,6 +66,7 @@ import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 export class Plugin extends PluginBase {
   private attachmentCollector: AttachmentCollector | null = null;
+  private pluginApi: null | PluginApiImpl = null;
 
   /**
    * Collects the attachments of the given notes into the folders the settings say they belong in,
@@ -85,6 +92,29 @@ export class Plugin extends PluginBase {
 
   protected override createTranslationsMap(): TranslationsMap {
     return translationsMap;
+  }
+
+  /**
+   * Declares the API for the base to publish, once `onloadImpl` has built it.
+   *
+   * Published by the base rather than by hand: the `plugin-loaded` broadcast's `apiVersions` is derived from
+   * this method alone, so a hand `publishPluginApi` call would announce this plugin as publishing no API at
+   * all — while the registry still worked, which is what makes that mistake invisible.
+   *
+   * @returns The declaration, or none while the feature surface is down.
+   */
+  protected override getPluginApis(): PluginApiDeclaration[] {
+    if (!this.pluginApi) {
+      return [];
+    }
+
+    return [
+      {
+        api: this.pluginApi,
+        apiVersion: PLUGIN_API_VERSION,
+        contract: PLUGIN_API_CONTRACT
+      }
+    ];
   }
 
   protected override getPluginConflicts(): PluginConflict[] {
@@ -259,6 +289,19 @@ export class Plugin extends PluginBase {
     // Does nothing in between rather than driving a collector whose components have been torn down.
     featureSurfaceLifetimeComponent.register(() => {
       this.attachmentCollector = null;
+    });
+
+    /*
+     * The published API, built here so the base can hand it out in `getPluginApis` — and cleared with the
+     * surface for the same reason the collector is, since it drives the same components.
+     */
+    this.pluginApi = new PluginApiImpl({
+      app: this.app,
+      attachmentPathManager,
+      handedOverSettingsComponent
+    });
+    featureSurfaceLifetimeComponent.register(() => {
+      this.pluginApi = null;
     });
 
     const unusedAttachmentsRemover = new UnusedAttachmentsRemover({

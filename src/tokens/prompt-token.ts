@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { TokenEvaluatorContext } from '../token-evaluator-context.ts';
 
 import { promptWithPreview } from '../prompt-with-preview-modal.ts';
-import { ActionContext } from '../token-evaluator-context.ts';
+import { isNonInteractiveActionContext } from '../token-evaluator-context.ts';
 import {
   formatString,
   stringFormatSchema
@@ -24,7 +24,7 @@ export class PromptToken extends TokenBase<Format> {
   }
 
   protected override async evaluateImpl(context: TokenEvaluatorContext, format: Format): Promise<string> {
-    if (context.actionContext === ActionContext.ValidateTokens || context.originalAttachmentFileName === DUMMY_PATH) {
+    if (isNonInteractiveActionContext(context.actionContext) || context.originalAttachmentFileName === DUMMY_PATH) {
       return DUMMY_PATH;
     }
 
