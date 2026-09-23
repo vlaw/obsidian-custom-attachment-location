@@ -31,7 +31,10 @@ import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/componen
 import { RenameDeleteHandlerComponent } from 'obsidian-dev-utils/obsidian/components/rename-delete-handler-component';
 import { SettingsMigrationComponent } from 'obsidian-dev-utils/obsidian/components/settings-migration-component';
 import { NOTEBOOK_NAVIGATOR_PLUGIN_ID } from 'obsidian-dev-utils/obsidian/notebook-navigator';
-import { publishPluginApi } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
+import {
+  publishPluginApi,
+  watchPluginApi
+} from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
   afterEach,
@@ -43,6 +46,7 @@ import {
 } from 'vitest';
 
 import type { MigratableSettings } from './advanced-rename-and-delete-handler.ts';
+import type { CustomAttachmentLocationApi } from './plugin-api.ts';
 
 import { ArrayBufferMap } from './array-buffer-map.ts';
 import { AttachmentCollector } from './attachment-collector.ts';
@@ -62,6 +66,7 @@ import { ImageManager } from './image-manager.ts';
 import { ImageSizeMap } from './image-size-map.ts';
 import { MarkdownUrlMap } from './markdown-url-map.ts';
 import { AppSaveAttachmentPatchComponent } from './patches/app-save-attachment-patch-component.ts';
+import { PLUGIN_API_CONTRACT } from './plugin-api.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { TokenValidator } from './token-validator.ts';
@@ -498,6 +503,59 @@ describe('Plugin', () => {
         plugin.collectAttachmentsInAbstractFiles([castTo<TFile>({ path: 'note.md' })]);
       }).not.toThrow();
       await noopAsync();
+    });
+  });
+
+  describe('published API', () => {
+    /*
+     * The per-note read exists BECAUSE the `Vault.getConfig` patch cannot answer for a note that is not
+     * open. That defect is proved end to end in
+     * `src/plugin-api-per-note-folder.desktop.integration.test.ts`; what is asserted here is only that the
+     * declaration reaches the registry at all, which is the half a consumer negotiates against.
+     */
+    it('should publish its reads through the registry, at the declared contract', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      const consumerComponent = new Component();
+      consumerComponent.load();
+      const apiRef = watchPluginApi<CustomAttachmentLocationApi>({
+        apiVersionRange: '^1',
+        app,
+        component: consumerComponent,
+        pluginId: manifest.id
+      });
+
+      expect(apiRef.value).not.toBeNull();
+      for (const methodName of Object.keys(PLUGIN_API_CONTRACT)) {
+        expect(apiRef.value).toHaveProperty(methodName, expect.any(Function));
+      }
+
+      consumerComponent.unload();
+      plugin.unload();
+    });
+
+    // The declaration is tied to the feature surface, so a consumer sees the API GO AWAY rather than
+    // Answering from components the dependency gate has torn down.
+    it('should revoke the handle once the dependency goes away', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      const consumerComponent = new Component();
+      consumerComponent.load();
+      const apiRef = watchPluginApi<CustomAttachmentLocationApi>({
+        apiVersionRange: '^1',
+        app,
+        component: consumerComponent,
+        pluginId: manifest.id
+      });
+      expect(apiRef.value).not.toBeNull();
+
+      unpublishProviderApi();
+
+      expect(apiRef.value).toBeNull();
+      consumerComponent.unload();
+      plugin.unload();
     });
   });
 

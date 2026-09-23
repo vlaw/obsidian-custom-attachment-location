@@ -43,6 +43,12 @@ export enum ActionContext {
   OpenFile = 'OpenFile',
 
   /**
+   * A read through this plugin's published API. Answers a question without performing an action, so it must
+   * never ask the user anything: an audit walking a vault would otherwise raise one dialog per note.
+   */
+  ReadApi = 'ReadApi',
+
+  /**
    * Rename note.
    */
   RenameNote = 'RenameNote',
@@ -301,4 +307,17 @@ export function attachmentPathContextToActionContext(context: AttachmentPathCont
       return ActionContext.Unknown;
     }
   }
+}
+
+/**
+ * Whether the action being performed has no user to ask.
+ *
+ * Tokens that would otherwise open a dialog consult this instead of naming the contexts themselves, so a
+ * context added later is handled in one place rather than in every interactive token.
+ *
+ * @param context - The action context.
+ * @returns `true` when nothing may be asked.
+ */
+export function isNonInteractiveActionContext(context: ActionContext): boolean {
+  return context === ActionContext.ReadApi || context === ActionContext.ValidateTokens;
 }

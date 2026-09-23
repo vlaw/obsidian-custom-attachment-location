@@ -65,6 +65,32 @@ Moved to [04 Custom tokens](<./demo-vault/04 Custom tokens.md>).
 
 Moved to [06 Settings](<./demo-vault/06 Settings.md>), under `markdownUrlFormat`.
 
+## For plugin developers
+
+Everything this plugin offers another plugin is declared in one hand-written file — [api.d.ts](./api.d.ts) at the repository root. It imports from `obsidian` and nothing else, so you can copy it into your own code or reference it where it sits, with no build-time dependency on this repository.
+
+The API is published through the `obsidian-dev-utils` plugin registry under the plugin id `obsidian-custom-attachment-location`, so you get version negotiation, a handle that is revoked when this plugin unloads, and a wait that ends when it loads rather than a lookup that returns `undefined` because it ran first:
+
+```ts
+const apiRef = watchPluginApi<CustomAttachmentLocationApi>({
+  apiVersionRange: '^1',
+  app,
+  component: this,
+  pluginId: 'obsidian-custom-attachment-location'
+});
+
+const folder = await apiRef.value?.getAttachmentFolderPath({ notePath: 'Notes/Alpha.md' });
+const properPath = await apiRef.value?.getProperAttachmentPath({ attachmentPathOrFile: 'image.png', notePath: 'Notes/Alpha.md' });
+```
+
+### Do not read `vault.getConfig('attachmentFolderPath')`
+
+This plugin patches that call, which makes it look like the seam you want. It is not one. The patch answers with this plugin's value only while a note is open, and the value it answers with is **the open note's** — computed once when the file was opened. A plugin looping over every note in the vault therefore gets the active note's attachment folder for all of them, silently, with no error and nothing to distinguish it from a correct answer. The patch is a write-path override for Obsidian's own attachment creation, not a readable configuration.
+
+`getAttachmentFolderPath` is the read, asked once per note. It answers `null` when this plugin leaves that note alone entirely, which is your cue to fall back to Obsidian's own `attachmentFolderPath` — a different answer from this plugin not being installed, and deliberately so.
+
+Both members arrived in contract version `1.0.0`, and both are asynchronous: an attachment folder is the result of evaluating a user-written template whose tokens can read the note's frontmatter and the attachment's bytes, so there is no synchronous answer to hand back. Neither ever asks the user anything, so a whole-vault audit raises no dialogs.
+
 ## Installation
 
 The plugin is available in [the official Community Plugins repository](https://community.obsidian.md/plugins/obsidian-custom-attachment-location).
