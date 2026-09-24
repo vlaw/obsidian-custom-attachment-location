@@ -24,7 +24,10 @@ import {
   Vault
 } from 'obsidian';
 import { abortSignalAny } from 'obsidian-dev-utils/abort-controller';
-import { noopAsync } from 'obsidian-dev-utils/function';
+import {
+  noop,
+  noopAsync
+} from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
 import { getCanvasReferences } from 'obsidian-dev-utils/obsidian/canvas';
 import { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
@@ -49,7 +52,10 @@ import {
 } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { NoPriorityWinnerReason } from 'obsidian-dev-utils/obsidian/note-priority';
-import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
+import {
+  addToQueue,
+  addToQueueAndWait
+} from 'obsidian-dev-utils/obsidian/queue';
 import { ResourceLockComponent } from 'obsidian-dev-utils/obsidian/resource-lock';
 import {
   cleanupEmptyFolders,
@@ -184,7 +190,8 @@ vi.mock('obsidian-dev-utils/obsidian/modals/confirm', async (importOriginal) => 
 
 vi.mock('obsidian-dev-utils/obsidian/queue', async (importOriginal) => ({
   ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/queue')>(),
-  addToQueue: vi.fn()
+  addToQueue: vi.fn(),
+  addToQueueAndWait: vi.fn()
 }));
 
 vi.mock('obsidian-dev-utils/obsidian/vault', async (importOriginal) => ({
@@ -212,6 +219,7 @@ const mockGetBacklinksForFileSafe = vi.mocked(getBacklinksForFileSafe);
 const mockGetCacheSafe = vi.mocked(getCacheSafe);
 const mockConfirm = vi.mocked(confirm);
 const mockAddToQueue = vi.mocked(addToQueue);
+const mockAddToQueueAndWait = vi.mocked(addToQueueAndWait);
 const mockCleanupEmptyFolders = vi.mocked(cleanupEmptyFolders);
 const mockCopySafe = vi.mocked(copySafe);
 const mockRenameSafe = vi.mocked(renameSafe);
@@ -457,6 +465,43 @@ describe('AttachmentCollector', () => {
       collector.collectAttachmentsInAbstractFiles(files);
       const params = castTo<QueueParamsLike>(mockAddToQueue.mock.calls[0]?.[0]);
       expect(params.operationName).toBe('Collect attachments in file');
+    });
+  });
+
+  describe('collectAttachmentsInAbstractFilesAndWait', () => {
+    // The published API's shape: the caller sequences on the collect, so the queue's settling is handed back.
+    it('should settle only once the queued operation has', async () => {
+      let finishQueuedOperation: () => void = noop;
+      mockAddToQueueAndWait.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishQueuedOperation = resolve;
+        })
+      );
+      let isSettled = false;
+
+      const collectPromise = collector.collectAttachmentsInAbstractFilesAndWait([strictProxy<TAbstractFile>({ path: 'a.md' })]).then(() => {
+        isSettled = true;
+      });
+      await noopAsync();
+      expect(isSettled).toBe(false);
+
+      finishQueuedOperation();
+      await collectPromise;
+      expect(isSettled).toBe(true);
+    });
+
+    it('should queue the same collect the fire-and-forget method does', async () => {
+      mockAddToQueueAndWait.mockResolvedValue(undefined);
+      mockIsFile.mockReturnValue(false);
+      mockConfirm.mockResolvedValue(false);
+
+      // A folder is confirmed with the user first, which is how the shared implementation shows itself.
+      await collector.collectAttachmentsInAbstractFilesAndWait([strictProxy<TAbstractFile>({ path: 'folder' })]);
+      const params = castTo<QueueParamsLike>(mockAddToQueueAndWait.mock.calls[0]?.[0]);
+      expect(params.operationName).toBe('Collect attachments in file');
+      await params.operationFunction(new AbortController().signal);
+
+      expect(mockConfirm).toHaveBeenCalled();
     });
   });
 

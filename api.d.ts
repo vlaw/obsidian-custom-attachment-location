@@ -23,7 +23,10 @@
  * instead, once per note.
  */
 
-import type { TFile } from 'obsidian';
+import type {
+  TAbstractFile,
+  TFile
+} from 'obsidian';
 
 /**
  * This plugin's API, published through the `obsidian-dev-utils` plugin registry under the plugin id
@@ -37,7 +40,9 @@ import type { TFile } from 'obsidian';
  *
  * ## Non-interactive
  *
- * Both reads run in a context that never asks the user anything. A folder or file-name template may hold a
+ * Both reads run in a context that never asks the user anything — unlike
+ * {@link CustomAttachmentLocationApi.collectAttachments} and {@link CustomAttachmentLocationApi.migrateSettings},
+ * which act and may ask. A folder or file-name template may hold a
  * `${prompt}` token, and an audit walking a vault must not raise one dialog per note. In that context the
  * token resolves to Obsidian's own placeholder path segment instead of opening a dialog, so a template that
  * genuinely needs the user produces an answer carrying that placeholder rather than a hang. A consumer that
@@ -51,6 +56,27 @@ import type { TFile } from 'obsidian';
  * being uninstalled, which for a consumer is the same thing to do about it.
  */
 export interface CustomAttachmentLocationApi {
+  /**
+   * Collects the attachments of the given notes, or of every note under the given folders, into the folders
+   * the settings say they belong in — exactly as the `Collect attachments` commands do.
+   *
+   * The commands act on the ACTIVE file, so without this a plugin wanting one particular note collected would
+   * have to open it first: a visible side effect of an unrelated operation.
+   *
+   * This is an action, not a read, and it behaves as the command does, dialogs included: several files or a
+   * folder are confirmed with the user first, a note this plugin leaves alone is refused with a notice, an
+   * attachment several notes share follows `collectAttachmentUsedByMultipleNotesMode` (which may be
+   * `Prompt`), and a template's `${prompt}` token asks. Do not call it from an audit that must stay silent.
+   *
+   * Added in contract version `1.2.0`.
+   *
+   * @param params - What to collect.
+   * @returns A promise that settles once the collect has finished — queued behind any collect already
+   *   running, so it is safe to call right after an operation of your own that moved or wrote the notes. A
+   *   caller that does not need to sequence on it need not await it.
+   */
+  collectAttachments(params: CollectAttachmentsParams): Promise<void>;
+
   /**
    * The folder this plugin would put a NEW attachment of `notePath`'s in.
    *
@@ -108,6 +134,18 @@ export interface CustomAttachmentLocationApi {
    * @returns Whether the user approved it. `false` means nothing was written.
    */
   migrateSettings(params: MigrateSettingsParams): Promise<MigrateSettingsResult>;
+}
+
+/**
+ * Parameters for {@link CustomAttachmentLocationApi.collectAttachments}.
+ */
+export interface CollectAttachmentsParams {
+  /**
+   * The notes to collect for, and folders whose notes are all collected for — each as a vault-relative path
+   * or as the file or folder itself. An entry naming nothing in the vault is skipped, so a list that names
+   * nothing collects nothing.
+   */
+  readonly pathsOrFiles: readonly (string | TAbstractFile)[];
 }
 
 /**

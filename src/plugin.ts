@@ -85,6 +85,10 @@ export class Plugin extends PluginBase {
    *
    * The work is queued rather than awaited, matching the command, so this returns immediately.
    *
+   * Superseded by the published API's `collectAttachments`, declared in `api.d.ts`, versioned, and revoked when
+   * this plugin unloads, where this method is a duck-typed reach into the plugin instance. Kept, delegating to
+   * the same collector, for callers written before contract version `1.2.0`; new callers use the API.
+   *
    * @param abstractFiles - The notes, or folders of notes, to collect attachments for.
    */
   public collectAttachmentsInAbstractFiles(abstractFiles: TAbstractFile[]): void {
@@ -306,6 +310,7 @@ export class Plugin extends PluginBase {
      */
     this.pluginApi = new PluginApiImpl({
       app: this.app,
+      attachmentCollector,
       attachmentPathManager,
       handedOverSettingsComponent,
       pluginSettingsComponent
