@@ -120,6 +120,11 @@ export const defaultTranslations = {
     },
     noOwningNote: 'No note references the attachment \'{{attachmentPath}}\'.',
     notePathIsIgnored: 'Note path is ignored',
+    nothingToCollect: {
+      part1: 'Nothing to collect in \'{{noteFilePath}}\': every attachment it could move is already in its destination folder.',
+      part2: 'Collected attachments are set to be renamed, but',
+      part3: 'is empty, which keeps each attachment\'s current name, so there is nothing left for the collect to change.'
+    },
     noUnusedAttachments: 'No unused attachments found.'
   },
   pluginConflict: {

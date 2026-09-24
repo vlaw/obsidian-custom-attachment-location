@@ -112,6 +112,7 @@ interface RenderInternalLinkParamsLike {
 
 interface SettingsLike {
   collectAttachmentUsedByMultipleNotesMode: CollectAttachmentUsedByMultipleNotesMode;
+  collectedAttachmentFileName: string;
   emptyFolderBehavior: EmptyFolderBehavior;
   getTimeoutInMilliseconds(): number;
   isAttachmentUnitFolder(path: string): boolean;
@@ -120,6 +121,7 @@ interface SettingsLike {
   isExtensionExcludedFromMultipleNotesCheck(path: string): boolean;
   isPathIgnored(path: string): boolean;
   notePriorities: readonly string[];
+  shouldRenameCollectedAttachments: boolean;
   shouldSkipCollectingAttachmentsReferencedByRawPath: boolean;
 }
 
@@ -226,9 +228,10 @@ const PLUGIN_NAME = 'Custom Attachment Location';
  * fragment appends it into the notice, which MOVES its nodes, leaving the captured fragment empty by
  * the time an assertion looks at it.
  *
- * Only fragment notices are recorded - the higher-priority report (issue #75) is the only one built
- * that way, because it carries links - so the string notices on the same path are left out without
- * having to filter them by wording.
+ * Only fragment notices are recorded - the two reports built that way are the higher-priority notes
+ * (issue #75), which carries links, and the nothing-to-collect report (issue #81), which carries a
+ * setting name in a code block - so the string notices on the same path are left out without having
+ * to filter them by wording.
  *
  * @param componentToSpyOn - The notice component to spy on.
  * @returns The recorded texts, filled as notices are shown.
@@ -344,6 +347,7 @@ describe('AttachmentCollector', () => {
     vi.clearAllMocks();
     settings = {
       collectAttachmentUsedByMultipleNotesMode: CollectAttachmentUsedByMultipleNotesMode.Move,
+      collectedAttachmentFileName: '',
       emptyFolderBehavior: EmptyFolderBehavior.DeleteWithEmptyParents,
       getTimeoutInMilliseconds: vi.fn<() => number>().mockReturnValue(1000),
       isAttachmentUnitFolder: vi.fn<(path: string) => boolean>().mockReturnValue(false),
@@ -352,6 +356,7 @@ describe('AttachmentCollector', () => {
       isExtensionExcludedFromMultipleNotesCheck: vi.fn<(path: string) => boolean>().mockReturnValue(false),
       isPathIgnored: vi.fn<(path: string) => boolean>().mockReturnValue(false),
       notePriorities: [],
+      shouldRenameCollectedAttachments: false,
       shouldSkipCollectingAttachmentsReferencedByRawPath: false
     };
     getRoot = vi.fn<() => TFolder>().mockReturnValue(strictProxy<TFolder>({ path: '/' }));
@@ -563,6 +568,116 @@ describe('AttachmentCollector', () => {
       mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks(['note.md']));
       await runSingleFile(note);
       expect(mockRenameSafe).not.toHaveBeenCalled();
+    });
+
+    describe('a run that collected nothing (issue #81)', () => {
+      beforeEach(() => {
+        mockGetLinks.mockReturnValue([createReference()]);
+        mockExtractLinkFile.mockReturnValue(createFile('img.png'));
+        mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks(['note.md']));
+        getProperAttachmentPath.mockResolvedValue(null);
+      });
+
+      it('should warn that a singly-referenced attachment is already in its destination folder', async () => {
+        // The commonest attachment of all, and the one path that used to report nothing at all -
+        // Not even to the console, while both multiple-notes branches warned.
+        await runSingleFile(note);
+
+        expect(warnSpy).toHaveBeenCalledWith('Skipping collecting attachment img.png as it is already in the destination folder.');
+      });
+
+      it('should tell the user the run moved nothing', async () => {
+        // The reporter read the console-only skip as an inert command and filed a bug against it.
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        expect(noticeTexts.join('\n')).toContain('Nothing to collect in \'note.md\'');
+      });
+
+      it('should name the collected file name setting when renaming is on and the template is empty', async () => {
+        // The reporter's own configuration, and the one that makes the outcome inevitable: the
+        // Toggle says rename, the empty template says keep the name, so only the folder could differ.
+        settings.shouldRenameCollectedAttachments = true;
+        settings.collectedAttachmentFileName = '';
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        expect(noticeTexts.join('\n')).toContain('Collected attachment file name');
+      });
+
+      it('should not name the setting when the template is set', async () => {
+        settings.shouldRenameCollectedAttachments = true;
+        settings.collectedAttachmentFileName = 'collected-attachment';
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        const noticeText = noticeTexts.join('\n');
+        expect(noticeText).toContain('Nothing to collect');
+        expect(noticeText).not.toContain('Collected attachment file name');
+      });
+
+      it('should not name the setting when renaming collected attachments is off', async () => {
+        settings.shouldRenameCollectedAttachments = false;
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        expect(noticeTexts.join('\n')).not.toContain('Collected attachment file name');
+      });
+
+      it('should stay quiet when the attachment did move', async () => {
+        getProperAttachmentPath.mockResolvedValue('attachments/img.png');
+        mockRenameSafe.mockResolvedValue('attachments/img.png');
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        expect(noticeTexts).toEqual([]);
+      });
+
+      it('should stay quiet when an attachment was skipped for another reason', async () => {
+        // An excluded attachment is not one that is already in place, so a message saying everything
+        // Is already in place would be false. The examined and already-in-place counts disagree.
+        vi.mocked(settings.isExcludedFromAttachmentCollecting).mockReturnValue(true);
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        expect(noticeTexts).toEqual([]);
+      });
+
+      it('should stay quiet when the note has no attachments at all', async () => {
+        // Nothing was examined, so there is nothing to explain - the command found no attachment
+        // Rather than declining to move one.
+        mockGetLinks.mockReturnValue([]);
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+
+        await runSingleFile(note);
+
+        expect(noticeTexts).toEqual([]);
+      });
+
+      it('should stay quiet outside a single-note run', async () => {
+        // A folder-wide or vault-wide collect visits notes the user never singled out, so the same
+        // Report there would be a box per note.
+        const noticeTexts = captureFragmentNoticeTexts(pluginNoticeComponent);
+        mockIsFile.mockReturnValue(false);
+        mockIsFolder.mockReturnValue(false);
+        mockConfirm.mockResolvedValue(true);
+        mockAbortSignalAny.mockReturnValue(new AbortController().signal);
+        mockLoop.mockImplementation(async (options) => {
+          await castTo<LoopOptionsLike>(options).processItem(note);
+        });
+
+        collector.collectAttachmentsInAbstractFiles([strictProxy<TAbstractFile>({ path: 'folder' })]);
+        const queueParams = castTo<QueueParamsLike>(mockAddToQueue.mock.calls[0]?.[0]);
+        await queueParams.operationFunction(new AbortController().signal);
+
+        expect(noticeTexts).toEqual([]);
+      });
     });
 
     describe('note priorities', () => {
