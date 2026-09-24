@@ -23,3 +23,9 @@ Consequences for anyone touching the tests:
 ## `api.d.ts` at the repo root is the whole published surface, and it imports `obsidian` alone
 
 The convention: a consumer copies that one file, or references it where it sits, with no build-time dependency on this repository. `src/plugin-api.ts` holds only the runtime half (`PLUGIN_API_CONTRACT`, `PLUGIN_API_VERSION`) and RE-EXPORTS the types from it, so each type is declared once. Adding a member means editing `api.d.ts`, the contract, the impl, and the version — a minor bump for an addition, which is what lets a consumer keep asking for `'^1'`.
+
+## A fresh install follows Obsidian's attachment location, so every test vault seeds pattern mode
+
+Since 13.0.0 `shouldFollowObsidianAttachmentLocation` defaults to on. While it is on, `attachmentFolderPath` is not consulted at all, so an integration vault with no `data.json` of ours quietly turns every pattern suite into a test of Obsidian's own setting. `scripts/helpers/plugin-settings-seed.ts` seeds `{ shouldFollowObsidianAttachmentLocation: false }`. The desktop/Android, demo-vault and performance setups all compose it, and a new project that opens a vault needs it too. The demo vault commits a full `data.json` in pattern mode for the same reason: notes 01 and 08 demonstrate patterns and hard-code `assets/<note>`.
+
+`PluginSettingsComponent.loadFromFile` writes `data.json` when none exists, because the obsidian-dev-utils base never does. Without that write, nothing on disk tells a fresh install apart from a user who never saved a setting, and a default change moves both.
