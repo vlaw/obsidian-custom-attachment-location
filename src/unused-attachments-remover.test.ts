@@ -503,6 +503,84 @@ describe('UnusedAttachmentsRemover', () => {
       }
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unused);
     });
+
+    /*
+     * Issue #89. Obsidian's parser folds an embed that follows a math block opened right after a list
+     * into the math block, so the cache and the backlink index both miss it. The note's own text still
+     * names the file, and that is enough to keep it.
+     */
+    it('should keep an attachment the note text embeds when the cache misses the embed', async () => {
+      const image = createFile(`${ATTACHMENT_FOLDER_PATH}/test.png`);
+      cachedRead.mockResolvedValue('- Item\n$$\nx\n\n$$\n![[test.png]]\n');
+      mockExtractLinkFile.mockImplementation((params) => params.link.link === 'test.png' ? image : null);
+      const recurseSpy = vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
+        callback(image);
+      });
+      mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks([]));
+      try {
+        await runOperation([note]);
+      } finally {
+        recurseSpy.mockRestore();
+      }
+      expect(cachedRead).toHaveBeenCalledExactlyOnceWith(note);
+      expect(mockGetBacklinksForFileSafe).not.toHaveBeenCalled();
+      expect(mockTrashSafe).not.toHaveBeenCalled();
+      expect(showNoticeSpy).toHaveBeenCalledExactlyOnceWith('No unused attachments found.');
+    });
+
+    it('should not resolve an external link found in the note text', async () => {
+      cachedRead.mockResolvedValue('[site](https://example.com/test.png)\n');
+      await runOperation([note]);
+      expect(mockExtractLinkFile).not.toHaveBeenCalled();
+    });
+
+    it('should not read the text of a canvas note', async () => {
+      mockIsCanvasFile.mockReturnValue(true);
+      mockGetCanvasReferences.mockResolvedValue([]);
+      await runOperation([note]);
+      expect(cachedRead).not.toHaveBeenCalled();
+    });
+
+    describe('references from other scanned notes', () => {
+      let image: TFile;
+      let other: TFile;
+
+      beforeEach(() => {
+        image = createFile(`${ATTACHMENT_FOLDER_PATH}/test.png`);
+        other = createFile('other.md');
+        mockIsNote.mockImplementation((f) => f === note || f === other);
+        // Only the other note's text names the image, and the backlink index knows nothing of it.
+        cachedRead.mockImplementation((file) => Promise.resolve(file === other ? '![[test.png]]\n' : ''));
+        mockExtractLinkFile.mockImplementation((params) => params.link.link === 'test.png' ? image : null);
+        getAttachmentFolderFullPathForPath.mockImplementation((params) => Promise.resolve(params.notePath === note.path ? ATTACHMENT_FOLDER_PATH : 'none'));
+        getFolderByPath.mockImplementation((path) => path === ATTACHMENT_FOLDER_PATH ? attachmentFolder : null);
+        vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
+          callback(image);
+        });
+        mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks([]));
+        mockConfirm.mockResolvedValue(true);
+      });
+
+      it('should keep an attachment another scanned note names in its text', async () => {
+        await runOperation([note, other]);
+        expect(mockTrashSafe).not.toHaveBeenCalled();
+        expect(showNoticeSpy).toHaveBeenCalledExactlyOnceWith('No unused attachments found.');
+      });
+
+      it('should keep an attachment several other scanned notes name', async () => {
+        const third = createFile('third.md');
+        mockIsNote.mockImplementation((f) => [note, other, third].includes(castTo<TFile>(f)));
+        cachedRead.mockImplementation((file) => Promise.resolve(file === note ? '' : '![[test.png]]\n'));
+        await runOperation([note, other, third]);
+        expect(mockTrashSafe).not.toHaveBeenCalled();
+      });
+
+      it('should not let an excluded note keep another note\'s attachment', async () => {
+        vi.mocked(settings.isExcludedFromMultipleNotesCheck).mockImplementation((path) => path === other.path);
+        await runOperation([note, other]);
+        expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, image);
+      });
+    });
   });
 
   /*
@@ -592,6 +670,26 @@ describe('UnusedAttachmentsRemover', () => {
       expect(mockTrashSafe).not.toHaveBeenCalled();
     });
 
+    it('should keep the unit whole when only the text of a note outside it names a member (#89)', async () => {
+      const other = createFile('other.md');
+      mockIsNote.mockImplementation((f) => f === note || f === other);
+      cachedRead.mockImplementation((file) => Promise.resolve(file === other ? '![[img.png]]\n' : ''));
+      mockExtractLinkFile.mockImplementation((params) => params.link.link === 'img.png' ? image : null);
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note, other]);
+      expect(mockTrashSafe).not.toHaveBeenCalled();
+    });
+
+    it('should not let the text of a note inside the unit keep it alive', async () => {
+      // The drawing is an `.md`, so a wider scope scans it as a note — its embed of a sibling is still the unit describing itself.
+      mockIsNote.mockImplementation((f) => f === note || f === drawing);
+      cachedRead.mockImplementation((file) => Promise.resolve(file === drawing ? '![[img.png]]\n' : ''));
+      mockExtractLinkFile.mockImplementation((params) => params.link.link === 'img.png' ? image : null);
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note, drawing]);
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
     it('should keep the unit whole when a member is referenced from both inside and outside', async () => {
       // Guards against the inside-the-unit filter swallowing the outside hit alongside it.
       backlinksByPath.set(image.path, [drawing.path, 'other.md']);
@@ -628,7 +726,8 @@ describe('UnusedAttachmentsRemover', () => {
       vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled);
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
-      expect(cachedRead).toHaveBeenCalledExactlyOnceWith(untitled);
+      // The scanning note is read for its links (#89); of the unit, only the note is read.
+      expect(cachedRead.mock.calls).toEqual([[note], [untitled]]);
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
     });
 
@@ -654,10 +753,11 @@ describe('UnusedAttachmentsRemover', () => {
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, drawing);
     });
 
-    it('should read no file when the unit holds attachments alone', async () => {
+    it('should read no file of the unit when it holds attachments alone', async () => {
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
-      expect(cachedRead).not.toHaveBeenCalled();
+      // The one read is the scanning note's own, for its links (#89).
+      expect(cachedRead).toHaveBeenCalledExactlyOnceWith(note);
     });
 
     it('should name the folder in the confirmation and say it goes whole', async () => {

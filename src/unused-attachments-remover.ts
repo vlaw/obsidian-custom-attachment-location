@@ -1,5 +1,6 @@
 import type {
   App,
+  Reference,
   TAbstractFile,
   TFile,
   TFolder
@@ -29,6 +30,10 @@ import {
   getCacheSafe,
   getLinks
 } from 'obsidian-dev-utils/obsidian/metadata-cache';
+import {
+  parseLinks,
+  toParseLinkReference
+} from 'obsidian-dev-utils/obsidian/parse-link';
 import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
 import {
   cleanupEmptyFolders,
@@ -260,8 +265,25 @@ export class UnusedAttachmentsRemover {
       return referencedAttachmentPaths;
     }
 
-    const references = isCanvasFile(note) ? await getCanvasReferences(this.app, note) : getLinks({ cache });
+    const references: Reference[] = isCanvasFile(note) ? [...await getCanvasReferences(this.app, note)] : [...getLinks({ cache })];
     abortSignal.throwIfAborted();
+
+    /*
+     * The note's own text, read for links too, because the cache alone can miss one (#89). Obsidian's
+     * parser folds `![[image.png]]` into a math block that directly follows a list, so the embed never
+     * reaches the cache, and deleting on the cache's word trashes a file the note still shows. A link the
+     * text scan finds and the cache does not — one inside a code block, say — can only KEEP a file, which is
+     * the safe way for a delete to be wrong.
+     */
+    if (!isCanvasFile(note)) {
+      const content = await this.app.vault.cachedRead(note);
+      abortSignal.throwIfAborted();
+      for (const parseLinkResult of parseLinks(content)) {
+        if (!parseLinkResult.isExternal) {
+          references.push(toParseLinkReference({ content, parseLinkResult }));
+        }
+      }
+    }
 
     for (const reference of references) {
       const referencedFile = extractLinkFile({
@@ -338,6 +360,38 @@ export class UnusedAttachmentsRemover {
      */
     const referencedAttachmentPaths = new Set<string>();
 
+    /**
+     * The subset of {@link referencedAttachmentPaths} whose referring note the multiple-notes check does NOT
+     * exclude — the references that keep ANOTHER note's attachment alive.
+     *
+     * Needed because a note judges its candidates by backlinks, and a reference the cache missed (#89) is
+     * missing from the backlink index too. So when note A's folder holds an image only note B embeds, and the
+     * parser misread B, A's scan calls the image unused. B's text scan found it; this set is how that answer
+     * reaches A's verdict. The exclusion mirrors the per-file rule, which ignores those notes' backlinks.
+     *
+     * Keyed by the referenced path, holding the paths of the notes that reference it, because the unit rule
+     * needs to know WHERE a reference comes from: a drawing inside a unit embedding its sibling is the unit
+     * describing itself, and must not keep it alive here any more than it does in the backlink check.
+     */
+    const referrerPathsByKeptAliveAttachmentPath = new Map<string, Set<string>>();
+
+    const recordReferences = (noteFile: TFile, paths: ReadonlySet<string>): void => {
+      const isKeepingAlive = !this.pluginSettingsComponent.settings.isExcludedFromMultipleNotesCheck(noteFile.path);
+      for (const path of paths) {
+        referencedAttachmentPaths.add(path);
+        if (!isKeepingAlive) {
+          continue;
+        }
+
+        const referrerPaths = referrerPathsByKeptAliveAttachmentPath.get(path);
+        if (referrerPaths) {
+          referrerPaths.add(noteFile.path);
+        } else {
+          referrerPathsByKeptAliveAttachmentPath.set(path, new Set([noteFile.path]));
+        }
+      }
+    };
+
     const scanNote = async (noteFile: TFile): Promise<void> => {
       abortSignal.throwIfAborted();
       if (this.handedOverSettingsComponent.isPathIgnored(noteFile.path)) {
@@ -349,9 +403,7 @@ export class UnusedAttachmentsRemover {
          * everything it holds alive as ownerless.
          */
         if (shouldScanOrphanAttachments) {
-          for (const referencedAttachmentPath of await this.collectReferencedAttachmentPaths(noteFile, abortSignal)) {
-            referencedAttachmentPaths.add(referencedAttachmentPath);
-          }
+          recordReferences(noteFile, await this.collectReferencedAttachmentPaths(noteFile, abortSignal));
         }
 
         return;
@@ -366,9 +418,7 @@ export class UnusedAttachmentsRemover {
         unusedUnitFolderByPath.set(unitFolder.path, unitFolder);
       }
 
-      for (const referencedAttachmentPath of scanResult.referencedAttachmentPaths) {
-        referencedAttachmentPaths.add(referencedAttachmentPath);
-      }
+      recordReferences(noteFile, scanResult.referencedAttachmentPaths);
     };
 
     /*
@@ -441,6 +491,24 @@ export class UnusedAttachmentsRemover {
 
       for (const unitFolder of orphanScanResult.unusedUnitFolders) {
         unusedUnitFolderByPath.set(unitFolder.path, unitFolder);
+      }
+    }
+
+    /*
+     * The last word goes to the scanned notes' own references, over the backlink index (#89). A unit
+     * folder holding any file a note OUTSIDE it names is kept too, since a unit dies whole or not at all.
+     */
+    for (const attachment of unusedAttachments) {
+      if (referrerPathsByKeptAliveAttachmentPath.has(attachment.path)) {
+        unusedAttachments.delete(attachment);
+      }
+    }
+
+    for (const unitFolderPath of unusedUnitFolderByPath.keys()) {
+      const insidePathPrefix = `${unitFolderPath}/`;
+      const isReferencedFromOutside = [...referrerPathsByKeptAliveAttachmentPath].some(([path, referrerPaths]) => path.startsWith(insidePathPrefix) && [...referrerPaths].some((referrerPath) => !referrerPath.startsWith(insidePathPrefix)));
+      if (isReferencedFromOutside) {
+        unusedUnitFolderByPath.delete(unitFolderPath);
       }
     }
 
