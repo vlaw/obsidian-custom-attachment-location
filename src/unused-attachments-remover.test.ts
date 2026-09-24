@@ -16,6 +16,7 @@ import type {
 } from 'vitest';
 
 import { Vault } from 'obsidian';
+import { noopAsync } from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
 import { getCanvasReferences } from 'obsidian-dev-utils/obsidian/canvas';
 import { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
@@ -27,12 +28,12 @@ import {
 } from 'obsidian-dev-utils/obsidian/file-system';
 import { initI18N } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { extractLinkFile } from 'obsidian-dev-utils/obsidian/link';
+import { renderInternalLink } from 'obsidian-dev-utils/obsidian/markdown';
 import {
   getBacklinksForFileSafe,
   getCacheSafe,
   getLinks
 } from 'obsidian-dev-utils/obsidian/metadata-cache';
-import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
 import {
   cleanupEmptyFolders,
@@ -57,11 +58,16 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
 
 import { translationsMap } from './i18n/locales/translations-map.ts';
+import { confirmMinimizable } from './modals/minimizable-confirm-modal.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 interface QueueParamsLike {
   operationFunction(abortSignal: AbortSignal): Promise<void>;
   operationName: string;
+}
+
+interface RenderInternalLinkParamsLike {
+  readonly pathOrAbstractFile: string | TAbstractFile;
 }
 
 interface SettingsLike {
@@ -98,9 +104,19 @@ vi.mock('obsidian-dev-utils/obsidian/metadata-cache', async (importOriginal) => 
   getLinks: vi.fn()
 }));
 
-vi.mock('obsidian-dev-utils/obsidian/modals/confirm', async (importOriginal) => ({
-  ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/modals/confirm')>(),
-  confirm: vi.fn()
+// The real renderer goes through Obsidian's markdown renderer; a bare anchor naming the path is all the
+// Dialog's text needs.
+vi.mock('obsidian-dev-utils/obsidian/markdown', async (importOriginal) => ({
+  ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/markdown')>(),
+  renderInternalLink: vi.fn(async (params: RenderInternalLinkParamsLike) => {
+    await noopAsync();
+    const path = typeof params.pathOrAbstractFile === 'string' ? params.pathOrAbstractFile : params.pathOrAbstractFile.path;
+    return createEl('a', { text: path });
+  })
+}));
+
+vi.mock('./modals/minimizable-confirm-modal.ts', () => ({
+  confirmMinimizable: vi.fn()
 }));
 
 vi.mock('obsidian-dev-utils/obsidian/queue', async (importOriginal) => ({
@@ -123,7 +139,8 @@ const mockExtractLinkFile = vi.mocked(extractLinkFile);
 const mockGetBacklinksForFileSafe = vi.mocked(getBacklinksForFileSafe);
 const mockGetCacheSafe = vi.mocked(getCacheSafe);
 const mockGetLinks = vi.mocked(getLinks);
-const mockConfirm = vi.mocked(confirm);
+const mockConfirm = vi.mocked(confirmMinimizable);
+const mockRenderInternalLink = vi.mocked(renderInternalLink);
 const mockAddToQueue = vi.mocked(addToQueue);
 const mockCleanupEmptyFolders = vi.mocked(cleanupEmptyFolders);
 const mockTrashSafe = vi.mocked(trashSafe);
@@ -653,6 +670,8 @@ describe('UnusedAttachmentsRemover', () => {
       expect(text).toContain(UNIT_FOLDER_PATH);
       // No individual-file section at all, so the dialog cannot read as "0 attachments".
       expect(text).not.toContain('attachment(s) will be moved to the trash.');
+      // The folder itself is linked, so its folder note opens or the folder is revealed.
+      expect(mockRenderInternalLink).toHaveBeenCalledExactlyOnceWith({ app, pathOrAbstractFile: unitFolder, shouldRevealFile: true });
     });
 
     it('should trash a unit folder once when several notes reach it', async () => {
@@ -823,6 +842,15 @@ describe('UnusedAttachmentsRemover', () => {
       expect(text).toContain(unusedA.path);
       expect(text).toContain(unusedB.path);
       expect(text).not.toContain('... and');
+    });
+
+    it('should list every path as a link to the file it names', async () => {
+      // #87: the dialog is the last gate before a delete, so each entry has to be something the user can open.
+      mockConfirm.mockResolvedValue(false);
+      await runOperation([note]);
+      expect(mockRenderInternalLink).toHaveBeenCalledTimes(2);
+      expect(mockRenderInternalLink).toHaveBeenCalledWith({ app, pathOrAbstractFile: unusedA, shouldRevealFile: true });
+      expect(mockRenderInternalLink).toHaveBeenCalledWith({ app, pathOrAbstractFile: unusedB, shouldRevealFile: true });
     });
 
     it('should cap the list and summarize the rest', async () => {

@@ -11,6 +11,7 @@ import {
   setIcon,
   Vault
 } from 'obsidian';
+import { createFragmentAsync } from 'obsidian-dev-utils/html-element';
 import { findAttachmentUnitFolderPath } from 'obsidian-dev-utils/obsidian/attachment-unit-folder';
 import { getCanvasReferences } from 'obsidian-dev-utils/obsidian/canvas';
 import {
@@ -19,16 +20,15 @@ import {
   isFolder,
   isNote
 } from 'obsidian-dev-utils/obsidian/file-system';
-import { appendCodeBlock } from 'obsidian-dev-utils/obsidian/html-element';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { extractLinkFile } from 'obsidian-dev-utils/obsidian/link';
 import { loop } from 'obsidian-dev-utils/obsidian/loop';
+import { renderInternalLink } from 'obsidian-dev-utils/obsidian/markdown';
 import {
   getBacklinksForFileSafe,
   getCacheSafe,
   getLinks
 } from 'obsidian-dev-utils/obsidian/metadata-cache';
-import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
 import {
   cleanupEmptyFolders,
@@ -40,6 +40,7 @@ import type { AttachmentPathManager } from './attachment-path-manager.ts';
 import type { HandedOverSettingsComponent } from './handed-over-settings-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+import { confirmMinimizable } from './modals/minimizable-confirm-modal.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
 // The note's attachment folder path template rarely depends on the attachment file name (the default
@@ -462,10 +463,15 @@ export class UnusedAttachmentsRemover {
       return;
     }
 
-    const isConfirmed = await confirm({
+    /*
+     * Minimizable, and every listed path is a link (#87). This dialog is the last gate before a delete, and
+     * the cheapest check on a wrong answer is to go and look at what it names — which a plain-text list in
+     * a dialog covering the workspace made impossible.
+     */
+    const isConfirmed = await confirmMinimizable({
       app: this.app,
       cancelButtonText: t(($) => $.obsidianDevUtils.buttons.cancel),
-      message: createFragment((f) => {
+      message: await createFragmentAsync(async (f) => {
         if (attachmentsToDelete.length > 0) {
           f.appendText(t(($) => $.deleteUnusedAttachments.confirm.part1));
           f.createEl('br');
@@ -476,7 +482,7 @@ export class UnusedAttachmentsRemover {
            */
           f.createEl('strong', { text: t(($) => $.deleteUnusedAttachments.confirm.count, { count: attachmentsToDelete.length }) });
           f.createEl('br');
-          appendPathList(f, attachmentsToDelete.map((attachment) => attachment.path));
+          await appendPathList(this.app, f, attachmentsToDelete);
         }
 
         /*
@@ -490,7 +496,7 @@ export class UnusedAttachmentsRemover {
           f.createEl('br');
           f.createEl('strong', { text: t(($) => $.deleteUnusedAttachments.confirm.unitFolderCount, { count: unitFoldersToDelete.length }) });
           f.createEl('br');
-          appendPathList(f, unitFoldersToDelete.map((unitFolder) => unitFolder.path));
+          await appendPathList(this.app, f, unitFoldersToDelete);
         }
 
         f.createEl('br');
@@ -773,22 +779,30 @@ export class UnusedAttachmentsRemover {
 }
 
 /**
- * Renders a capped, code-formatted list of vault paths into the confirmation dialog.
+ * Renders a capped list of links to vault items into the confirmation dialog.
  *
+ * A file link opens the file and reveals it in the file explorer. A folder link opens the folder's folder
+ * note when it has one, and otherwise reveals the folder: a unit folder only reaches this dialog when no
+ * note inside it has content, so opening "the first note in it" would show an empty page.
+ *
+ * @param app - The Obsidian app instance.
  * @param parentEl - The fragment to append the list to.
- * @param paths - The paths to list.
+ * @param abstractFiles - The files or folders to list.
  */
-function appendPathList(parentEl: DocumentFragment, paths: string[]): void {
-  parentEl.createEl('ul', {}, (ul) => {
-    for (const path of paths.slice(0, CONFIRM_LIST_LIMIT)) {
-      ul.createEl('li', {}, (li) => {
-        appendCodeBlock(li, path);
-      });
-    }
-    if (paths.length > CONFIRM_LIST_LIMIT) {
-      ul.createEl('li', {
-        text: t(($) => $.deleteUnusedAttachments.confirm.andMore, { count: paths.length - CONFIRM_LIST_LIMIT })
-      });
-    }
-  });
+async function appendPathList(app: App, parentEl: DocumentFragment, abstractFiles: readonly TAbstractFile[]): Promise<void> {
+  const ul = parentEl.createEl('ul');
+  for (const abstractFile of abstractFiles.slice(0, CONFIRM_LIST_LIMIT)) {
+    ul.createEl('li').append(
+      await renderInternalLink({
+        app,
+        pathOrAbstractFile: abstractFile,
+        shouldRevealFile: true
+      })
+    );
+  }
+  if (abstractFiles.length > CONFIRM_LIST_LIMIT) {
+    ul.createEl('li', {
+      text: t(($) => $.deleteUnusedAttachments.confirm.andMore, { count: abstractFiles.length - CONFIRM_LIST_LIMIT })
+    });
+  }
 }
