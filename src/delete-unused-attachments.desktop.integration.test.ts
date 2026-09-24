@@ -68,7 +68,14 @@ describe('Delete unused attachments (issue #23)', () => {
         const sharedFile = app.vault.getFileByPath(sharedPath);
         let refBacklinkCount = 0;
         let sharedBacklinkCount = 0;
-        const resolveDeadline = Date.now() + 8000;
+        /*
+         * The four deadline loops in this closure run one after another and total 20s, under the transport's
+         * ~30s per-closure default. The project raises its command timeout past that, but only as a backstop:
+         * spent, it would kill the call as a bare transport timeout during the third loop, and the fourth —
+         * the one this test is about — would never get to report. Each waits for something that happens
+         * within moments on a quiet machine.
+         */
+        const resolveDeadline = Date.now() + 4000;
         while (Date.now() < resolveDeadline) {
           refBacklinkCount = refFile ? app.metadataCache.getBacklinksForFile(refFile).keys().length : 0;
           sharedBacklinkCount = sharedFile ? app.metadataCache.getBacklinksForFile(sharedFile).keys().length : 0;
@@ -90,7 +97,7 @@ describe('Delete unused attachments (issue #23)', () => {
          * - The metadata cache still has work queued. Until the three attachments are indexed the plugin
          *   Sees nothing unused, reports "nothing to delete" and never opens a modal.
          */
-        const activeDeadline = Date.now() + 8000;
+        const activeDeadline = Date.now() + 4000;
         while (Date.now() < activeDeadline && app.workspace.getActiveFile()?.path !== note.path) {
           await sleep(100);
         }
@@ -110,7 +117,7 @@ describe('Delete unused attachments (issue #23)', () => {
 
         // Drive the real confirmation modal: wait for it, then click its OK button.
         let isModalShown = false;
-        const modalDeadline = Date.now() + 12_000;
+        const modalDeadline = Date.now() + 6000;
         while (Date.now() < modalDeadline) {
           const okButton = document.querySelector('.modal-container .ok-button');
           if (okButton) {
@@ -122,7 +129,7 @@ describe('Delete unused attachments (issue #23)', () => {
         }
 
         // The trash runs on the plugin's internal queue; poll until the orphan leaves the vault.
-        const trashDeadline = Date.now() + 12_000;
+        const trashDeadline = Date.now() + 6000;
         while (Date.now() < trashDeadline) {
           if (!app.vault.getFileByPath(orphanPath)) {
             break;

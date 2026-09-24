@@ -23,7 +23,16 @@ import {
  */
 
 const PLUGIN_ID = 'obsidian-custom-attachment-location';
-const WAIT_TIMEOUT_IN_MILLISECONDS = 30_000;
+/*
+ * Under the transport's ~30s per-closure default, not at it. The project raises its command timeout past that,
+ * but only as a backstop: a closure that spends it dies as a bare transport timeout, never as the unsettled
+ * relocation the closure reports by name. `writeForeignAttachment` is called twice and charges this once plus
+ * two 3000 ms settles each, so the closure declares ~22s. The relocation of one small file settles within
+ * moments.
+ *
+ * Consumed only inside the closure, as its `input`; no Node-side wait reads it.
+ */
+const WAIT_TIMEOUT_IN_MILLISECONDS = 5000;
 
 interface ProbeResult {
   readonly attachmentPathAfterDrawing: string;
