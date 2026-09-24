@@ -542,7 +542,9 @@ describe('PluginSettingsTab', () => {
   });
 
   it('should render the expected settings', async () => {
-    const { names } = await createTab();
+    const { names } = await createTab((settings) => {
+      settings.shouldFollowObsidianAttachmentLocation = false;
+    });
     expect(names).toContain('Location for new attachments');
     expect(names).toContain('Generated attachment file name');
     expect(names).toContain('Duplicate name separator');
@@ -646,9 +648,16 @@ describe('PluginSettingsTab', () => {
     tab.refreshDomState = refreshDomStateSpy;
     const captured = toggles.find((entry) => entry.name === 'Follow Obsidian attachment location');
     expect(captured).toBeDefined();
-    captured?.toggle.setValue(true);
+    // On by default, so switching it OFF is the change a user makes.
+    captured?.toggle.setValue(false);
     await waitForAllAsyncOperations();
     expect(refreshDomStateSpy).toHaveBeenCalled();
+  });
+
+  it('should hide the location template by default, because a fresh install follows Obsidian', async () => {
+    const { names } = await createTab();
+    expect(names).toContain('Follow Obsidian attachment location');
+    expect(names).not.toContain('Location for new attachments');
   });
 
   it('should hide the location template while the plugin follows Obsidian\'s own location', async () => {
@@ -660,7 +669,9 @@ describe('PluginSettingsTab', () => {
   });
 
   it('should show the location template while the plugin uses its own template', async () => {
-    const { names } = await createTab();
+    const { names } = await createTab((settings) => {
+      settings.shouldFollowObsidianAttachmentLocation = false;
+    });
     expect(names).toContain('Location for new attachments');
   });
 
@@ -754,7 +765,9 @@ describe('PluginSettingsTab', () => {
   });
 
   it('should normalize and trim the attachment folder path when its value changes', async () => {
-    const { pluginSettingsComponent, textLikeComponents } = await createTab();
+    const { pluginSettingsComponent, textLikeComponents } = await createTab((settings) => {
+      settings.shouldFollowObsidianAttachmentLocation = false;
+    });
     const component = findComponent(textLikeComponents, 'Location for new attachments');
     component.setValue('assets/folder   ');
     await waitForAllAsyncOperations();
