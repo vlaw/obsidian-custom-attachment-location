@@ -4,8 +4,10 @@ Open **Settings -> Community plugins -> Custom Attachment Location** to configur
 
 ## Location for new attachments
 
+- `shouldFollowObsidianAttachmentLocation`
+  - **On by default since 13.0.0.** New attachments go wherever Obsidian's own **Files and links -> Default location for new attachments** says, and `attachmentFolderPath` is not used. So a fresh install changes nothing until you turn it off and pick a pattern. This vault has it off, so the pattern demos work. See [01 Attachment folder location](<./01 Attachment folder location.md>).
 - `attachmentFolderPath`
-  - the folder each new attachment is saved into (a pattern). Start it with `./` for a path relative to the note; otherwise it is relative to the vault root.
+  - the folder each new attachment is saved into (a pattern), while `shouldFollowObsidianAttachmentLocation` is off. Start it with `./` for a path relative to the note; otherwise it is relative to the vault root. Defaults to `./assets/${noteFileName}`, the location every release before 13.0.0 used out of the box.
 
 ## Attachment file naming
 

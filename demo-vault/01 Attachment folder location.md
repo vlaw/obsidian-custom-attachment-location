@@ -1,10 +1,12 @@
 # Attachment folder location
 
-The headline feature: **you** decide the folder each attachment is saved into, per note, using tokens. This vault ships with the plugin's default location setting:
+The headline feature: **you** decide the folder each attachment is saved into, per note, using tokens. This vault is set to the plugin's default pattern:
 
 ```text
 ./assets/${noteFileName}
 ```
+
+A fresh install does not start here. It follows Obsidian's own attachment setting, so installing the plugin changes nothing until you turn off **Follow Obsidian attachment location** - see **Let Obsidian decide** below. This vault has already turned it off, so that the patterns on this page take effect.
 
 The `./` means "relative to the folder of the note you are editing", and `${noteFileName}` expands to the current note's name. So an attachment pasted here goes into a folder named after this note.
 
@@ -81,7 +83,7 @@ Manual equivalent for all of them: edit **Location for new attachments** in **Se
 
 Obsidian has a folder setting of its own: **Settings -> Files and links -> Default location for new attachments**. While this plugin uses its own pattern, that setting is not in effect, and Obsidian's settings page says so - the row reads *Controlled by Custom Attachment Location*, with a button that opens this plugin's settings.
 
-Turn on **Follow Obsidian attachment location** (`shouldFollowObsidianAttachmentLocation`) and it is the other way round: new attachments go wherever Obsidian's own setting says, Obsidian's settings page shows its own control again, and **Location for new attachments** is hidden and not used. The pattern you had is kept, so turning the mode off brings it back. Only the folder follows Obsidian - the file-name settings in [02 Attachment file naming](<./02 Attachment file naming.md>) still apply.
+Turn on **Follow Obsidian attachment location** (`shouldFollowObsidianAttachmentLocation`) - it is on in a fresh install - and it is the other way round: new attachments go wherever Obsidian's own setting says, Obsidian's settings page shows its own control again, and **Location for new attachments** is hidden and not used. The pattern you had is kept, so turning the mode off brings it back. Only the folder follows Obsidian - the file-name settings in [02 Attachment file naming](<./02 Attachment file naming.md>) still apply.
 
 Each of Obsidian's four options lands where Obsidian itself puts it:
 

@@ -192,8 +192,12 @@ export class PluginSettings {
    * and the mode can never destroy the template. Only the FOLDER follows Obsidian; the file-name settings
    * still apply. An explicit {@link collectedAttachmentFolderPath} still wins for the collecting commands, as
    * it does over the template.
+   *
+   * On by default since 13.0.0, so a fresh install changes nothing about where attachments land until the user
+   * picks a pattern. The template default stays `./assets/${noteFileName}`, the default of every earlier
+   * release, so a user whose attachments moved on the upgrade switches this off and has the old behavior back.
    */
-  public shouldFollowObsidianAttachmentLocation = false;
+  public shouldFollowObsidianAttachmentLocation = true;
 
   public shouldPreserveImageMetadata = false;
   public shouldRenameCollectedAttachments = false;
