@@ -45,7 +45,18 @@ const REPORTER_UNIT_FOLDER_PATTERN = String.raw`/(^|\/)@\/[^/]+$/`;
 const EXPECTED_MODAL_TITLE = 'Attachment used by several notes';
 const MIGRATION_MODAL_TITLE_PREFIX = 'Settings proposed by ';
 
-const WAIT_TIMEOUT_IN_MILLISECONDS = 30_000;
+/*
+ * Under the transport's ~30s default per-closure cap, not at it. The project raises its CDP command timeout
+ * well past that, but only as a backstop: a closure that spends it dies as a bare transport timeout naming the
+ * harness, never the wait that overran. The one closure below charges this ceiling SIX times — the settings
+ * dialog on the way in and on the way back, and four waits of its own — plus a one-second settle, and the whole
+ * callback is a single evaluation, so it is the sum that has to fit. Every one of those waits is for an event
+ * that fires within moments on a quiet machine. Sized as the sibling rescue suite's is.
+ *
+ * Consumed only inside the closure. The Node-side budget is `TEST_TIMEOUT_IN_MILLISECONDS`, which the cap does
+ * not govern.
+ */
+const WAIT_TIMEOUT_IN_MILLISECONDS = 3500;
 const TEST_TIMEOUT_IN_MILLISECONDS = 180_000;
 const EXPECTED_BACKLINK_COUNT = 3;
 const EXPECTED_BUTTON_COUNT = 3;
