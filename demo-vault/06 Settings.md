@@ -46,6 +46,8 @@ Open **Settings -> Community plugins -> Custom Attachment Location** to configur
 
 ## Collecting attachments
 
+- `shouldCollectAttachmentsAutomatically`
+  - collect a note's attachments each time the note changes, without asking. Default off. See [05 Collect attachments](<./05 Collect attachments.md>).
 - `shouldRenameCollectedAttachments`
   - rename attachments processed by the **Collect attachments** commands.
 - `collectedAttachmentFileName`
