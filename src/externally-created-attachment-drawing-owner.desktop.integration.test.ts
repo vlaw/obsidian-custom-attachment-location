@@ -34,6 +34,14 @@ const PLUGIN_ID = 'obsidian-custom-attachment-location';
  */
 const WAIT_TIMEOUT_IN_MILLISECONDS = 5000;
 
+interface EditableViewLike {
+  readonly editor?: EditorLike;
+}
+
+interface EditorLike {
+  replaceSelection(text: string): void;
+}
+
 interface ProbeResult {
   readonly attachmentPathAfterDrawing: string;
   readonly attachmentPathAfterNote: string;
@@ -166,6 +174,12 @@ describe('An attachment written by another plugin while a drawing is open is lef
           const pathsBefore = new Set(app.vault.getFiles().map((file) => file.path));
           await app.vault.createBinary(imageName, new ArrayBuffer(4));
           createdPaths.push(imageName);
+          /*
+           * ...and link it from the open file, as a plugin inserting an attachment does. A file nothing links
+           * to is never moved (issue #88), so both phases carry the embed and the drawing phase still tests
+           * the drawing gate rather than the missing link.
+           */
+          (app.workspace.getLeaf(false).view as EditableViewLike).editor?.replaceSelection(`![[${imageName}]]`);
 
           if (shouldExpectRelocation) {
             /*

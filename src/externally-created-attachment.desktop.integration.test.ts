@@ -38,6 +38,11 @@ interface ForeignAttachmentResult {
 
 interface RunParams {
   /**
+   * Whether the creating plugin links the file from the note. Issue #88's shape when `false`: a plugin
+   * writing a file for its own use, which nothing links to and which must stay where it was written.
+   */
+  readonly isLinked?: boolean;
+  /**
    * Issue #82's shape instead of issue #59's: a note inside a folder, the attachment folder template
    * `./assets/${noteFileName}`, the vault on RELATIVE Markdown links, and the embed spelled relative to
    * the note. That spelling holds the vault path nowhere, which is what used to write the folder twice.
@@ -49,7 +54,7 @@ interface RunParams {
 describe('Attachments created by other plugins (issue #59)', () => {
   async function run(params: RunParams): Promise<ForeignAttachmentResult> {
     return await evalInObsidian({
-      async callback({ app, isRelativeLinkScenario, shouldRename: isRenameEnabled }): Promise<ForeignAttachmentResult> {
+      async callback({ app, isLinked, isRelativeLinkScenario, shouldRename: isRenameEnabled }): Promise<ForeignAttachmentResult> {
         interface ForeignSettings {
           attachmentFolderPath: string;
           attachmentRenameMode: string;
@@ -179,7 +184,9 @@ describe('Attachments created by other plugins (issue #59)', () => {
          * the embed ends up pointing at the moved file.
          */
         const view = leaf.view as EditableViewLike;
-        view.editor?.replaceSelection(insertedEmbed);
+        if (isLinked) {
+          view.editor?.replaceSelection(insertedEmbed);
+        }
 
         const deadline = Date.now() + 15_000;
         while (Date.now() < deadline) {
@@ -211,7 +218,7 @@ describe('Attachments created by other plugins (issue #59)', () => {
 
         return { finalPaths, linkTargetPath, noteContent, properPath, settingsFound: true };
       },
-      input: { isRelativeLinkScenario: params.isRelativeLinkScenario, shouldRename: params.shouldRename },
+      input: { isLinked: params.isLinked ?? true, isRelativeLinkScenario: params.isRelativeLinkScenario, shouldRename: params.shouldRename },
       vaultPath: getTemporaryVault().path
     });
   }
@@ -236,6 +243,14 @@ describe('Attachments created by other plugins (issue #59)', () => {
     expect(result.finalPaths[0]).toMatch(/^foreign-[\d-]+\/mx-img-[\d-]+\.png$/);
     // Nothing moved, so the embed still points where the creating plugin put it.
     expect(result.noteContent).toContain('mx-img-');
+  }, 120_000);
+
+  it('leaves a file no note links to where its plugin wrote it, even with the setting on (issue #88)', async () => {
+    const result = await run({ isLinked: false, isRelativeLinkScenario: false, shouldRename: true });
+
+    expect(result.settingsFound).toBe(true);
+    expect(result.finalPaths).toHaveLength(1);
+    expect(result.finalPaths[0]).toMatch(/^foreign-[\d-]+\/mx-img-[\d-]+\.png$/);
   }, 120_000);
 
   it('repoints an embed spelled relative to the note without writing its folder twice (issue #82)', async () => {

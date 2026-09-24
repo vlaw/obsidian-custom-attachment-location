@@ -70,6 +70,8 @@ const NOTE_PATH = 'notes/my-note.md';
 const FOREIGN_ATTACHMENT_PATH = 'wherever/mx-img-abc.png';
 // Mirrors FRESHLY_CREATED_THRESHOLD_IN_MILLISECONDS in the component under test.
 const FRESHLY_CREATED_THRESHOLD_IN_MILLISECONDS = 10_000;
+// Mirrors NOTE_REFERENCE_WAIT_IN_MILLISECONDS in the component under test.
+const NOTE_REFERENCE_WAIT_IN_MILLISECONDS = 5000;
 
 const mockPrintError = vi.mocked(printError);
 
@@ -156,11 +158,18 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
    * That single call is the whole simulation: `obsidian-test-mocks` stats the new file from the
    * adapter and fires `create` for it, exactly as the real vault does, so nothing here stamps a
    * `ctime` or fires the event by hand.
+   *
+   * The note links to the file unless `isLinked` is `false`: only a linked file is an attachment at all
+   * (issue #88), and every case but the ones about that boundary is about what happens to an attachment.
    */
-  async function createForeignAttachment(path = FOREIGN_ATTACHMENT_PATH): Promise<TFile> {
+  async function createForeignAttachment(path = FOREIGN_ATTACHMENT_PATH, isLinked = true): Promise<TFile> {
     const parentFolderPath = dirname(path);
     if (!await getApp().vault.exists(parentFolderPath)) {
       await getApp().vault.createFolder(parentFolderPath);
+    }
+
+    if (isLinked) {
+      getApp().metadataCache.resolvedLinks[NOTE_PATH] = { [path]: 1 };
     }
 
     const file = await getApp().vault.createBinary(path, new ArrayBuffer(4));
@@ -544,6 +553,47 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
 
     expect(transactionSpy).not.toHaveBeenCalled();
     expect(editor.getValue()).toBe('nothing to do with it');
+  });
+
+  it('should leave a file no note links to where its plugin wrote it (issue #88)', async () => {
+    /*
+     * The reporter's shape: a plugin keeps a JSON file of its own under its own folder and reads it back from
+     * that path. Nothing links to it, so it is that plugin's data rather than an attachment, and moving it
+     * broke the plugin.
+     */
+    vi.useFakeTimers();
+    try {
+      await setUp();
+      const promise = createForeignAttachment('Lingua Study/Transcripts/abc.json', false);
+      await vi.advanceTimersByTimeAsync(NOTE_REFERENCE_WAIT_IN_MILLISECONDS + 1000);
+      await promise;
+      await flush();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(renameFileSpy).not.toHaveBeenCalled();
+    expect(getApp().vault.getFileByPath('Lingua Study/Transcripts/abc.json')).not.toBeNull();
+  });
+
+  it('should wait for the creating plugin to insert its embed after the write', async () => {
+    vi.useFakeTimers();
+    try {
+      await setUp();
+      const editor = await openEditorWith('');
+      const promise = createForeignAttachment(FOREIGN_ATTACHMENT_PATH, false);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(renameFileSpy).not.toHaveBeenCalled();
+
+      editor.setValue('![[mx-img-abc.png]]');
+      await vi.advanceTimersByTimeAsync(1000);
+      await promise;
+      await flush();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(renameFileSpy).toHaveBeenCalledOnce();
   });
 
   it('should report a failed move instead of swallowing it', async () => {
