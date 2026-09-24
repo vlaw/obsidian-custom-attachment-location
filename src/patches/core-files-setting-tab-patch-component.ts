@@ -32,7 +32,7 @@ import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
-export const CORE_FILES_SETTING_TAB_ID = 'file';
+const CORE_FILES_SETTING_TAB_ID = 'file';
 const ATTACHMENT_FOLDER_PATH_CONFIG_KEY = 'attachmentFolderPath';
 
 interface CoreFilesSettingTabPatchComponentConstructorParams {

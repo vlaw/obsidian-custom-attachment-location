@@ -25,10 +25,7 @@ import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 import type { PluginSettings } from '../plugin-settings.ts';
 
 import { translationsMap } from '../i18n/locales/translations-map.ts';
-import {
-  CORE_FILES_SETTING_TAB_ID,
-  CoreFilesSettingTabPatchComponent
-} from './core-files-setting-tab-patch-component.ts';
+import { CoreFilesSettingTabPatchComponent } from './core-files-setting-tab-patch-component.ts';
 
 interface CoreFilesSettingTabDouble {
   getSettingDefinitions(): SettingDefinitionItem[];
@@ -40,6 +37,8 @@ interface SettingsState {
   readonly effectiveValues: Pick<PluginSettings, 'shouldFollowObsidianAttachmentLocation'>;
 }
 
+// Obsidian's own id for the core Files and links settings tab.
+const CORE_FILES_SETTING_TAB_ID = 'file';
 const PLUGIN_ID = 'obsidian-custom-attachment-location';
 
 // Stand-ins for Obsidian's own rows. The render sources mention the config key exactly as Obsidian's do.
