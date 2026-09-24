@@ -123,6 +123,14 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
       settings: createSettings(overrides?.settings)
     });
 
+    /*
+     * Obsidian always carries a link format; the mock models none, and link generation refuses an unknown
+     * one. `shortest` is Obsidian's own default.
+     */
+    getApp().vault.setConfig('newLinkFormat', 'shortest');
+    // Shortest-form link generation asks which files share the name; the mock models no such lookup.
+    // eslint-disable-next-line unicorn/name-replacements -- `getLinkpathDest` is Obsidian's own spelling; the stub has to answer to it.
+    getApp().metadataCache.getLinkpathDest = (linkpath: string): TFile[] => getApp().vault.getFiles().filter((file) => file.name === linkpath || file.basename === linkpath);
     await getApp().vault.createFolder('notes');
     await getApp().vault.create(NOTE_PATH, '');
     vi.spyOn(getApp().workspace, 'getActiveFile').mockReturnValue(getApp().vault.getFileByPath(NOTE_PATH));
@@ -415,6 +423,8 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
      * an unsaved editor is not one of them — without the editor pass the note keeps pointing at a
      * path that no longer exists.
      */
+    // The link is regenerated in the vault's own format, so a full-path one needs the absolute format.
+    getApp().vault.setConfig('newLinkFormat', 'absolute');
     const editor = await openEditorWith(`intro\n![[${FOREIGN_ATTACHMENT_PATH}]]\noutro`);
 
     await createForeignAttachment();
@@ -478,11 +488,51 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
 
   it('should repoint a percent-encoded Markdown link too', async () => {
     await setUp();
+    getApp().vault.setConfig('newLinkFormat', 'absolute');
     const editor = await openEditorWith(`![](${encodeURI(FOREIGN_ATTACHMENT_PATH)})`);
 
     await createForeignAttachment();
 
     expect(editor.getValue()).toBe('![](notes/assets/renamed.png)');
+  });
+
+  it('should repoint a link spelled relative to the note without writing its folder twice (issue #82)', async () => {
+    await setUp();
+    /*
+     * The reporter's shape: the foreign file already sits in the note's attachment folder, the embed is
+     * spelled relative to the note, and the vault's link format is relative. Substituting the bare file
+     * name inside that link with a link text that carries the folder again produced
+     * `./assets/assets/renamed.png`, which resolves to nothing.
+     */
+    getApp().vault.setConfig('newLinkFormat', 'relative');
+    vi.spyOn(getApp().metadataCache, 'fileToLinktext').mockReturnValue('assets/renamed.png');
+    await getApp().vault.createFolder('notes/assets');
+    const editor = await openEditorWith('before ![](./assets/mx-img-abc.png) after');
+
+    await createForeignAttachment('notes/assets/mx-img-abc.png');
+
+    expect(editor.getValue()).toBe('before ![](./assets/renamed.png) after');
+  });
+
+  it('should leave a link to a different file with the same name alone', async () => {
+    await setUp();
+    const editor = await openEditorWith('![](elsewhere/mx-img-abc.png)');
+
+    await createForeignAttachment();
+
+    expect(editor.getValue()).toBe('![](elsewhere/mx-img-abc.png)');
+  });
+
+  it('should repoint a vault-absolute link and leave heading-only and external links on the line alone', async () => {
+    await setUp();
+    getApp().vault.setConfig('newLinkFormat', 'absolute');
+    const editor = await openEditorWith(
+      `[[#Intro]] ![](https://example.com/mx-img-abc.png) ![](/${FOREIGN_ATTACHMENT_PATH})`
+    );
+
+    await createForeignAttachment();
+
+    expect(editor.getValue()).toBe('[[#Intro]] ![](https://example.com/mx-img-abc.png) ![](/notes/assets/renamed.png)');
   });
 
   it('should leave an editor that does not mention the attachment untouched', async () => {
