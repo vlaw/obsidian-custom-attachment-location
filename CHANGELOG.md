@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## 12.1.0-beta.0
+
+- chore(cspell): whitelist lintable
+- Merge pull request #1 from vlaw/feat/md5-token
+- chore(cspell): whitelist vlaw
+- chore: untrack local AI agent tooling
+- refactor: read the attachment-unit-folder designation through the library
+- feat: exempt chosen attachment file types from the multiple notes check
+- feat: give Collect attachments a destination of its own
+- docs(agents): find the handler's dialogs by title, not by a bare modal lookup
+- test(rescue): accept issue #71's tie dialog with both real plugins on one vault
+- fix(deps): float devalue to 5.9.4, clearing GHSA-9rgm-9g3h-6x36
+- chore(deps): drop the dead markdown-it override
+- chore(deps): drop the dead js-yaml override
+- fix(deps): override smol-toml to clear a denial-of-service advisory
+- docs: replace the private rule-id citations with what they assert
+- test: run the mobile file-drawer retry from Node, so its own diagnostic can fire
+- docs: name the library and the sibling plugins so a reader can resolve them
+- docs: replace the private tracker references with what they pointed at
+- test: bring eight in-closure wait ceilings under the transport's per-eval cap
+- feat!: require Advanced Rename and Delete Handler instead of suggesting it
+- feat: warn about the Consistent Attachments and Links collecting overlap
+
 ## 12.0.1
 
 - test: cover the three unused-attachments-remover paths the gate was short on
