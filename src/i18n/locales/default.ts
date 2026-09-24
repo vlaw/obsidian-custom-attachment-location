@@ -526,7 +526,7 @@ export const defaultTranslations = {
       description: {
         part1: 'Whether to apply the attachment folder and file name settings to attachments that OTHER plugins create.',
         part2: 'Some plugins write an attachment into the vault under a name of their own, without asking Obsidian where it belongs. When this is on, such a file is moved and renamed right after it appears.',
-        part3: 'Only files created while a note is open are touched, never files arriving from a sync or a vault import.',
+        part3: 'Only files created while a note is open, and linked from a note, are touched: a file no note links to is data another plugin keeps for itself and stays where it was written. Files arriving from a sync or a vault import are never touched.',
         part4: 'The creating plugin is identified from the call stack of the write. That is best-effort: no plugin is identified for a file written by Obsidian itself, by a sync client, or by a plugin that defers its write. Such a file counts as NOT being in the list below.'
       },
       name: 'Rename attachments created by other plugins'

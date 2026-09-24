@@ -11,7 +11,10 @@ import {
   Component,
   TFile
 } from 'obsidian';
-import { convertAsyncToSync } from 'obsidian-dev-utils/async';
+import {
+  convertAsyncToSync,
+  setTimeoutAsync
+} from 'obsidian-dev-utils/async';
 import { printError } from 'obsidian-dev-utils/error';
 import {
   splitSubpath,
@@ -41,6 +44,8 @@ import { Substitutions } from './substitutions.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
 const FRESHLY_CREATED_THRESHOLD_IN_MILLISECONDS = 10_000;
+const NOTE_REFERENCE_POLL_INTERVAL_IN_MILLISECONDS = 100;
+const NOTE_REFERENCE_WAIT_IN_MILLISECONDS = 5000;
 
 interface ExternallyCreatedAttachmentHandlerComponentConstructorParams {
   readonly app: App;
@@ -192,11 +197,39 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
       return;
     }
 
+    if (!await this.waitForNoteReference(attachmentFile, noteFile)) {
+      return;
+    }
+
     try {
       await this.moveToProperPath(attachmentFile, noteFile);
     } catch (error) {
       printError(error);
     }
+  }
+
+  /**
+   * Tells whether any note links to the file right now.
+   *
+   * An open editor is read first, since that is where a creating plugin's freshly inserted embed sits before
+   * the note is saved and indexed. A link in an editor with no file of its own is resolved against the note
+   * the templates are evaluated for.
+   *
+   * @param attachmentFile - The file another plugin created.
+   * @param noteFile - The note the templates are evaluated against.
+   * @returns Whether a note links to the file.
+   */
+  private isReferencedByNote(attachmentFile: TFile, noteFile: TFile): boolean {
+    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.Markdown)) {
+      const view = leaf.view as MarkdownView;
+      const sourcePath = view.file?.path ?? noteFile.path;
+      const text = view.editor.getValue();
+      if (parseLinks(text).some((parseLinkResult) => !parseLinkResult.isExternal && isLinkTo(parseLinkResult.url, attachmentFile.path, sourcePath))) {
+        return true;
+      }
+    }
+
+    return Object.values(this.app.metadataCache.resolvedLinks).some((links) => Object.hasOwn(links, attachmentFile.path));
   }
 
   private async moveToProperPath(attachmentFile: TFile, noteFile: TFile): Promise<void> {
@@ -319,6 +352,38 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
         // A line-scoped transaction rather than `setValue`, so the cursor and the undo history survive.
         editor.transaction({ changes });
       }
+    }
+  }
+
+  /**
+   * Waits for a note to link to the file, which is what makes it an attachment at all (issue #88).
+   *
+   * A plugin writes files for its own use too — Lingua Study keeps a transcript JSON under its own folder and
+   * reads it back from that path — and moving one of those breaks that plugin. What tells the two apart is not
+   * the extension, the folder or the creating plugin but whether a note refers to the file: a user's attachment
+   * is embedded or linked, a plugin's private data is not. So a file nothing links to is left where it was
+   * written.
+   *
+   * The creating plugin inserts its embed AFTER its write resolves, which is after `create` fired, so the link
+   * is waited for rather than expected at once. Media Extended inserts within milliseconds; the window only
+   * delays the answer for a file that is never linked, and that file is never moved anyway.
+   *
+   * @param attachmentFile - The file another plugin created.
+   * @param noteFile - The note the templates are evaluated against.
+   * @returns Whether a note linked to the file within the window.
+   */
+  private async waitForNoteReference(attachmentFile: TFile, noteFile: TFile): Promise<boolean> {
+    const deadline = Date.now() + NOTE_REFERENCE_WAIT_IN_MILLISECONDS;
+    for (;;) {
+      if (this.isReferencedByNote(attachmentFile, noteFile)) {
+        return true;
+      }
+
+      if (Date.now() >= deadline) {
+        return false;
+      }
+
+      await setTimeoutAsync(NOTE_REFERENCE_POLL_INTERVAL_IN_MILLISECONDS);
     }
   }
 }
