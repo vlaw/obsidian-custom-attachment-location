@@ -49,7 +49,10 @@ import {
   getLinks
 } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
-import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
+import {
+  addToQueue,
+  addToQueueAndWait
+} from 'obsidian-dev-utils/obsidian/queue';
 import {
   isCanvasTextNodeReference,
   referenceToFileChange
@@ -248,6 +251,22 @@ export class AttachmentCollector {
 
   public collectAttachmentsInAbstractFiles(abstractFiles: TAbstractFile[]): void {
     addToQueue({
+      abortSignal: this.abortSignalComponent.abortSignal,
+      operationFunction: (abortSignal) => this.collectAttachmentsInAbstractFilesImpl(abstractFiles, abortSignal),
+      operationName: t(($) => $.menuItems.collectAttachmentsInFile),
+      timeoutInMilliseconds: this.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
+    });
+  }
+
+  /**
+   * The same queued collect as {@link collectAttachmentsInAbstractFiles}, settling once it has finished — the
+   * shape the published API hands another plugin, so it can sequence on the collect.
+   *
+   * @param abstractFiles - The notes, or folders of notes, to collect attachments for.
+   * @returns A promise that settles once the collect has finished.
+   */
+  public async collectAttachmentsInAbstractFilesAndWait(abstractFiles: TAbstractFile[]): Promise<void> {
+    await addToQueueAndWait({
       abortSignal: this.abortSignalComponent.abortSignal,
       operationFunction: (abortSignal) => this.collectAttachmentsInAbstractFilesImpl(abstractFiles, abortSignal),
       operationName: t(($) => $.menuItems.collectAttachmentsInFile),

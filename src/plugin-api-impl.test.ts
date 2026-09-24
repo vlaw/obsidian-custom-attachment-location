@@ -3,14 +3,21 @@ import type {
   App,
   PluginManifest,
   Reference,
+  TAbstractFile,
   TFile
 } from 'obsidian';
 import type { Mock } from 'vitest';
 
-import { noop } from 'obsidian-dev-utils/function';
+import {
+  noop,
+  noopAsync
+} from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
 import { DUMMY_PATH } from 'obsidian-dev-utils/obsidian/attachment-path';
-import { getFileOrNull } from 'obsidian-dev-utils/obsidian/file-system';
+import {
+  getAbstractFileOrNull,
+  getFileOrNull
+} from 'obsidian-dev-utils/obsidian/file-system';
 import { getBacklinksForFileSafe } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
@@ -21,6 +28,7 @@ import {
   vi
 } from 'vitest';
 
+import type { AttachmentCollector } from './attachment-collector.ts';
 import type { AttachmentPathManager } from './attachment-path-manager.ts';
 import type { SettingsMigrationRow } from './collect-settings-migration.ts';
 import type { HandedOverSettingsComponent } from './handed-over-settings-component.ts';
@@ -42,6 +50,7 @@ vi.mock('./modals/collect-settings-migration-modal.ts', () => ({
 
 vi.mock('obsidian-dev-utils/obsidian/file-system', async (importOriginal) => ({
   ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/file-system')>(),
+  getAbstractFileOrNull: vi.fn(),
   getFileOrNull: vi.fn()
 }));
 
@@ -51,6 +60,7 @@ vi.mock('obsidian-dev-utils/obsidian/metadata-cache', async (importOriginal) => 
 }));
 
 const mockGetBacklinksForFileSafe = vi.mocked(getBacklinksForFileSafe);
+const mockGetAbstractFileOrNull = vi.mocked(getAbstractFileOrNull);
 const mockGetFileOrNull = vi.mocked(getFileOrNull);
 
 const ATTACHMENT_FILE = createFile('Attachments/image.png');
@@ -71,6 +81,7 @@ function createFile(path: string): TFile {
 }
 
 describe('PluginApiImpl', () => {
+  let collectAttachmentsInAbstractFilesAndWait: Mock<AttachmentCollector['collectAttachmentsInAbstractFilesAndWait']>;
   let getAttachmentFolderFullPathForPath: Mock<AttachmentPathManager['getAttachmentFolderFullPathForPath']>;
   let getProperAttachmentPath: Mock<AttachmentPathManager['getProperAttachmentPath']>;
   let getSequenceNumberMap: Mock<AttachmentPathManager['getSequenceNumberMap']>;
@@ -81,12 +92,16 @@ describe('PluginApiImpl', () => {
     vi.clearAllMocks();
 
     ignoredPaths = new Set<string>();
+    collectAttachmentsInAbstractFilesAndWait = vi.fn().mockResolvedValue(undefined);
     getAttachmentFolderFullPathForPath = vi.fn().mockResolvedValue('Attachments/Alpha');
     getProperAttachmentPath = vi.fn().mockResolvedValue('Attachments/Alpha/image.png');
     getSequenceNumberMap = vi.fn().mockResolvedValue(new Map([[ATTACHMENT_FILE.path, 3]]));
 
     pluginApi = new PluginApiImpl({
       app: strictProxy<App>({}),
+      attachmentCollector: strictProxy<AttachmentCollector>({
+        collectAttachmentsInAbstractFilesAndWait
+      }),
       attachmentPathManager: strictProxy<AttachmentPathManager>({
         getAttachmentFolderFullPathForPath,
         getProperAttachmentPath,
@@ -106,6 +121,66 @@ describe('PluginApiImpl', () => {
     for (const methodName of Object.keys(PLUGIN_API_CONTRACT)) {
       expect(pluginApi).toHaveProperty(methodName, expect.any(Function));
     }
+  });
+
+  describe('collectAttachments', () => {
+    const NOTE_FILE = createFile(NOTE_PATH);
+
+    beforeEach(() => {
+      mockGetAbstractFileOrNull.mockImplementation(({ pathOrFile }) => {
+        if (typeof pathOrFile !== 'string') {
+          return pathOrFile;
+        }
+        return pathOrFile === NOTE_PATH ? NOTE_FILE : null;
+      });
+    });
+
+    it('should resolve paths and hand the files to the collector', async () => {
+      await pluginApi.collectAttachments({ pathsOrFiles: [NOTE_PATH] });
+
+      expect(collectAttachmentsInAbstractFilesAndWait).toHaveBeenCalledWith([NOTE_FILE]);
+    });
+
+    it('should pass a file or folder the caller already holds straight through', async () => {
+      const folder = strictProxy<TAbstractFile>({ path: 'Notes' });
+
+      await pluginApi.collectAttachments({ pathsOrFiles: [folder] });
+
+      expect(collectAttachmentsInAbstractFilesAndWait).toHaveBeenCalledWith([folder]);
+    });
+
+    it('should skip an entry that names nothing in the vault', async () => {
+      await pluginApi.collectAttachments({ pathsOrFiles: ['Missing.md', NOTE_PATH] });
+
+      expect(collectAttachmentsInAbstractFilesAndWait).toHaveBeenCalledWith([NOTE_FILE]);
+    });
+
+    // An empty list is not a no-op to the collector: it confirms several-or-none with the user.
+    it('should not reach the collector when nothing named exists', async () => {
+      await pluginApi.collectAttachments({ pathsOrFiles: ['Missing.md'] });
+
+      expect(collectAttachmentsInAbstractFilesAndWait).not.toHaveBeenCalled();
+    });
+
+    it('should settle only once the collect has finished', async () => {
+      let finishCollect: () => void = noop;
+      collectAttachmentsInAbstractFilesAndWait.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishCollect = resolve;
+        })
+      );
+      let isSettled = false;
+
+      const collectPromise = pluginApi.collectAttachments({ pathsOrFiles: [NOTE_PATH] }).then(() => {
+        isSettled = true;
+      });
+      await noopAsync();
+      expect(isSettled).toBe(false);
+
+      finishCollect();
+      await collectPromise;
+      expect(isSettled).toBe(true);
+    });
   });
 
   describe('getAttachmentFolderPath', () => {
@@ -200,6 +275,7 @@ describe('PluginApiImpl', () => {
          * the way the real record does.
          */
         app: castTo<App>({ plugins: { manifests } }),
+        attachmentCollector: strictProxy<AttachmentCollector>({}),
         attachmentPathManager: strictProxy<AttachmentPathManager>({}),
         handedOverSettingsComponent: strictProxy<HandedOverSettingsComponent>({}),
         pluginSettingsComponent: strictProxy<PluginSettingsComponent>({

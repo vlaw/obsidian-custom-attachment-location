@@ -1,16 +1,24 @@
-import type { App } from 'obsidian';
+import type {
+  App,
+  TAbstractFile
+} from 'obsidian';
 
 import {
   noop,
   noopAsync
 } from 'obsidian-dev-utils/function';
 import { DUMMY_PATH } from 'obsidian-dev-utils/obsidian/attachment-path';
-import { getFileOrNull } from 'obsidian-dev-utils/obsidian/file-system';
+import {
+  getAbstractFileOrNull,
+  getFileOrNull
+} from 'obsidian-dev-utils/obsidian/file-system';
 import { getBacklinksForFileSafe } from 'obsidian-dev-utils/obsidian/metadata-cache';
 
+import type { AttachmentCollector } from './attachment-collector.ts';
 import type { AttachmentPathManager } from './attachment-path-manager.ts';
 import type { HandedOverSettingsComponent } from './handed-over-settings-component.ts';
 import type {
+  CollectAttachmentsParams,
   CustomAttachmentLocationApi,
   GetAttachmentFolderPathParams,
   GetProperAttachmentPathParams,
@@ -26,17 +34,20 @@ import {
 import { showCollectSettingsMigrationModal } from './modals/collect-settings-migration-modal.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
+/*
+ * The published names, re-spelled under the names the params-interface convention wants. They are aliases
+ * rather than separate declarations, so `api.d.ts` stays the single place either shape is described.
+ */
+type PluginApiImplCollectAttachmentsParams = CollectAttachmentsParams;
+
 interface PluginApiImplConstructorParams {
   readonly app: App;
+  readonly attachmentCollector: AttachmentCollector;
   readonly attachmentPathManager: AttachmentPathManager;
   readonly handedOverSettingsComponent: HandedOverSettingsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
-/*
- * The published names, re-spelled under the names the params-interface convention wants. They are aliases
- * rather than separate declarations, so `api.d.ts` stays the single place either shape is described.
- */
 type PluginApiImplGetAttachmentFolderPathParams = GetAttachmentFolderPathParams;
 
 type PluginApiImplGetProperAttachmentPathParams = GetProperAttachmentPathParams;
@@ -50,6 +61,7 @@ type PluginApiImplGetProperAttachmentPathParams = GetProperAttachmentPathParams;
  */
 export class PluginApiImpl implements CustomAttachmentLocationApi {
   private readonly app: App;
+  private readonly attachmentCollector: AttachmentCollector;
   private readonly attachmentPathManager: AttachmentPathManager;
   private readonly handedOverSettingsComponent: HandedOverSettingsComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
@@ -62,9 +74,37 @@ export class PluginApiImpl implements CustomAttachmentLocationApi {
 
   public constructor(params: PluginApiImplConstructorParams) {
     this.app = params.app;
+    this.attachmentCollector = params.attachmentCollector;
     this.attachmentPathManager = params.attachmentPathManager;
     this.handedOverSettingsComponent = params.handedOverSettingsComponent;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
+  }
+
+  /**
+   * Collects the attachments of the given notes and folders, as the `Collect attachments` commands do.
+   *
+   * @param params - What to collect.
+   * @returns A promise that settles once the collect has finished.
+   */
+  public async collectAttachments(params: PluginApiImplCollectAttachmentsParams): Promise<void> {
+    const abstractFiles: TAbstractFile[] = [];
+
+    for (const pathOrFile of params.pathsOrFiles) {
+      const abstractFile = getAbstractFileOrNull({ app: this.app, pathOrFile });
+      if (abstractFile) {
+        abstractFiles.push(abstractFile);
+      }
+    }
+
+    /*
+     * Nothing named exists, so there is nothing to collect. Handing the collector an empty list would not be
+     * a no-op: several-or-none is what it confirms with the user, and that dialog would list no files.
+     */
+    if (abstractFiles.length === 0) {
+      return;
+    }
+
+    await this.attachmentCollector.collectAttachmentsInAbstractFilesAndWait(abstractFiles);
   }
 
   /**

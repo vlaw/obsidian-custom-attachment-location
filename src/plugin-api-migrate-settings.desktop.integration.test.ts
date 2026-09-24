@@ -268,7 +268,7 @@ describe('migrateSettings', () => {
     });
 
     expect(result.apiFound).toBe(true);
-    expect(result.apiVersion).toBe('1.1.0');
+    expect(result.apiVersion).toBe('1.2.0');
     expect(result.settingsFound).toBe(true);
 
     expect(result.noChangeResult).toBe(true);
