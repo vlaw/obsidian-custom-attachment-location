@@ -1,5 +1,9 @@
 import type { App } from 'obsidian';
 
+import {
+  noop,
+  noopAsync
+} from 'obsidian-dev-utils/function';
 import { DUMMY_PATH } from 'obsidian-dev-utils/obsidian/attachment-path';
 import { getFileOrNull } from 'obsidian-dev-utils/obsidian/file-system';
 import { getBacklinksForFileSafe } from 'obsidian-dev-utils/obsidian/metadata-cache';
@@ -9,15 +13,24 @@ import type { HandedOverSettingsComponent } from './handed-over-settings-compone
 import type {
   CustomAttachmentLocationApi,
   GetAttachmentFolderPathParams,
-  GetProperAttachmentPathParams
+  GetProperAttachmentPathParams,
+  MigrateSettingsParams,
+  MigrateSettingsResult
 } from './plugin-api.ts';
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+import {
+  applyMigrationRows,
+  buildSettingsMigrationRows
+} from './collect-settings-migration.ts';
+import { showCollectSettingsMigrationModal } from './modals/collect-settings-migration-modal.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
 interface PluginApiImplConstructorParams {
   readonly app: App;
   readonly attachmentPathManager: AttachmentPathManager;
   readonly handedOverSettingsComponent: HandedOverSettingsComponent;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
 /*
@@ -39,11 +52,19 @@ export class PluginApiImpl implements CustomAttachmentLocationApi {
   private readonly app: App;
   private readonly attachmentPathManager: AttachmentPathManager;
   private readonly handedOverSettingsComponent: HandedOverSettingsComponent;
+  private readonly pluginSettingsComponent: PluginSettingsComponent;
+
+  /**
+   * The tail of the dialog queue. Two proposals arriving at once would otherwise stack two dialogs, and the
+   * second would compare against settings the first is about to change.
+   */
+  private queuedMigrations = noopAsync();
 
   public constructor(params: PluginApiImplConstructorParams) {
     this.app = params.app;
     this.attachmentPathManager = params.attachmentPathManager;
     this.handedOverSettingsComponent = params.handedOverSettingsComponent;
+    this.pluginSettingsComponent = params.pluginSettingsComponent;
   }
 
   /**
@@ -111,5 +132,64 @@ export class PluginApiImpl implements CustomAttachmentLocationApi {
       reference,
       sequenceNumber: sequenceNumberByAttachmentPath.get(attachmentFile.path) ?? 0
     });
+  }
+
+  /**
+   * Offers the user the collect settings another plugin proposes, and applies what they approve.
+   *
+   * @param migrateSettingsParams - The proposal.
+   * @returns What the user approved.
+   */
+  // eslint-disable-next-line obsidian-dev-utils/params-options-name-match -- The type is the published contract's, shared with the interface this class implements; renaming it per class+method would rename it in every consumer.
+  public async migrateSettings(migrateSettingsParams: MigrateSettingsParams): Promise<MigrateSettingsResult> {
+    const previousMigrations = this.queuedMigrations;
+    let releaseQueue: () => void = noop;
+    this.queuedMigrations = new Promise<void>((resolve) => {
+      releaseQueue = resolve;
+    });
+
+    await previousMigrations;
+
+    try {
+      return await this.migrateSettingsWithoutQueueing(migrateSettingsParams);
+    } finally {
+      releaseQueue();
+    }
+  }
+
+  private getSourcePluginName(sourcePluginId: string): string {
+    return this.app.plugins.manifests[sourcePluginId]?.name ?? sourcePluginId;
+  }
+
+  // eslint-disable-next-line obsidian-dev-utils/params-options-name-match -- Same published contract type, one call deeper.
+  private async migrateSettingsWithoutQueueing(migrateSettingsParams: MigrateSettingsParams): Promise<MigrateSettingsResult> {
+    const rows = buildSettingsMigrationRows({
+      currentSettings: this.pluginSettingsComponent.settings,
+      proposedSettings: migrateSettingsParams.proposedSettings
+    });
+
+    /*
+     * Nothing the proposal names differs from what this plugin already holds, so there is nothing to ask
+     * about. The migration counts as done, and the caller may retire its pending proposal.
+     */
+    if (rows.length === 0) {
+      return { isApplied: true };
+    }
+
+    const approvedRows = await showCollectSettingsMigrationModal({
+      app: this.app,
+      rows,
+      sourcePluginName: this.getSourcePluginName(migrateSettingsParams.sourcePluginId)
+    });
+
+    if (!approvedRows) {
+      return { isApplied: false };
+    }
+
+    await this.pluginSettingsComponent.editAndSave((settings) => {
+      applyMigrationRows(settings, approvedRows);
+    });
+
+    return { isApplied: true };
   }
 }

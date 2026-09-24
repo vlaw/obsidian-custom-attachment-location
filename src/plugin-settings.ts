@@ -172,6 +172,16 @@ export class PluginSettings {
   public renamedAttachmentFileName = '';
 
   /**
+   * Whether a note's attachments are collected each time the note changes, as if
+   * `Collect attachments in current note` had been run on it.
+   *
+   * Off by default. Collecting moves files, and with this on it happens on every save of a note, without being
+   * asked. It is the setting Consistent Attachments and Links offered before it handed collecting over to this
+   * plugin, and it is migrated from there.
+   */
+  public shouldCollectAttachmentsAutomatically = false;
+
+  /**
    * Whether a new attachment goes wherever Obsidian's own *Default location for new attachments* says.
    *
    * On, {@link attachmentFolderPath} is not consulted at all: the folder is Obsidian's setting, resolved the

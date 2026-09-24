@@ -20,6 +20,7 @@ import {
   getAvailablePathForAttachments
 } from 'obsidian-dev-utils/obsidian/attachment-path';
 import {
+  getAbstractFileOrNull,
   getFileOrNull,
   getPath,
   isNote
@@ -38,9 +39,11 @@ import {
 import {
   basename,
   dirname,
+  extname,
   join,
   makeFileName
 } from 'obsidian-dev-utils/path';
+import { escapeRegExp } from 'obsidian-dev-utils/reg-exp';
 import { trimStart } from 'obsidian-dev-utils/string';
 import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
 
@@ -434,6 +437,10 @@ export class AttachmentPathManager {
       return null;
     }
 
+    if (this.isParkedBesideProperPath(params.attachmentFile, newAttachmentPath)) {
+      return null;
+    }
+
     return newAttachmentPath;
   }
 
@@ -538,6 +545,42 @@ export class AttachmentPathManager {
      * named as it is and moves only its folder.
      */
     return context === AttachmentPathContext.RenameNote && !this.handedOverSettingsComponent.settings.shouldRenameAttachmentFiles;
+  }
+
+  /**
+   * Whether the attachment already sits at its proper path under a duplicate suffix, because a different
+   * file holds the proper path itself.
+   *
+   * A move onto an occupied path lands on `<name><separator><n>`, which never equals the proper path. Without
+   * this check, every later collect sees that mismatch and moves the file again, to the next free suffix.
+   * With `Collect attachments automatically` on, each of those moves rewrites the note, which fires the next
+   * collect, and the file is renamed without end. A parked file whose proper path has since come FREE is not
+   * parked any more, and moving it there is a real improvement, so the proper path must still be occupied.
+   *
+   * @param attachmentFile - The attachment.
+   * @param properPath - Where it belongs.
+   * @returns `true` when there is nothing to move.
+   */
+  private isParkedBesideProperPath(attachmentFile: TFile, properPath: string): boolean {
+    // The proper path always keeps the attachment's own extension, so only the folder and the base name can differ.
+    if (dirname(attachmentFile.path) !== dirname(properPath)) {
+      return false;
+    }
+
+    const properBaseName = basename(properPath, extname(properPath));
+    const duplicateSuffixRegExp = new RegExp(
+      String.raw`^${escapeRegExp(properBaseName)}${escapeRegExp(this.pluginSettingsComponent.settings.duplicateNameSeparator)}\d+$`,
+      'u'
+    );
+    if (!duplicateSuffixRegExp.test(attachmentFile.basename)) {
+      return false;
+    }
+
+    return getAbstractFileOrNull({
+      app: this.app,
+      isCaseInsensitive: true,
+      pathOrFile: properPath
+    }) !== null;
   }
 
   private async resolvePathTemplate(params: AttachmentPathManagerResolvePathTemplateParams): Promise<string> {

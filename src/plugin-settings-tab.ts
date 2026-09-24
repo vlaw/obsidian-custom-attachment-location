@@ -391,6 +391,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
             });
           });
         }
+      }),
+      this.settingEx({
+        desc: t(($) => $.pluginSettingsTab.shouldCollectAttachmentsAutomatically.description),
+        name: t(($) => $.pluginSettingsTab.shouldCollectAttachmentsAutomatically.name),
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            this.bind({
+              propertyName: 'shouldCollectAttachmentsAutomatically',
+              valueComponent: toggle
+            });
+          });
+        }
       })
     ];
   }
