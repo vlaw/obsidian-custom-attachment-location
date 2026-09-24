@@ -89,7 +89,32 @@ export interface CustomAttachmentLocationApi {
    *   referenced by that note. `null` therefore means "nothing to do", in every one of its senses.
    */
   getProperAttachmentPath(params: GetProperAttachmentPathParams): Promise<null | string>;
+
+  /**
+   * Offers the user settings another plugin used to own, and applies what they approve.
+   *
+   * The one member that DOES ask the user something. This plugin owns the settings, so it owns the dialog: it
+   * puts each proposed value next to the one it holds now, and the user approves, edits or declines each row.
+   * The proposing plugin never writes into this plugin's `data.json`.
+   *
+   * Only the settings that would actually change are shown. A proposal that changes nothing opens no dialog
+   * and answers `isApplied: true`, since there is nothing left to hand over. Two proposals arriving at once
+   * are asked one after the other, never as two dialogs stacked on top of each other.
+   *
+   * Added in contract version `1.1.0`. Its shape matches `obsidian-dev-utils`' `SettingsMigrationApi`, so a
+   * consumer that has that library can hand the whole offer to its `SettingsMigrationComponent`.
+   *
+   * @param params - The proposal.
+   * @returns Whether the user approved it. `false` means nothing was written.
+   */
+  migrateSettings(params: MigrateSettingsParams): Promise<MigrateSettingsResult>;
 }
+
+/**
+ * What `Collect attachments` does with an attachment several notes reference. The same spellings the
+ * settings file stores.
+ */
+export type CollectAttachmentUsedByMultipleNotesMode = 'Cancel' | 'Copy' | 'Move' | 'Prompt' | 'Skip';
 
 /**
  * Parameters for {@link CustomAttachmentLocationApi.getAttachmentFolderPath}.
@@ -110,6 +135,74 @@ export interface GetAttachmentFolderPathParams {
    */
   readonly notePath: string;
 }
+
+/**
+ * The settings another plugin may propose through {@link CustomAttachmentLocationApi.migrateSettings}: the ones
+ * that go with collecting attachments.
+ *
+ * Every member is optional, so a plugin proposes only what it actually held, and a value this plugin already
+ * has is never overwritten by a default nobody chose.
+ */
+export interface MigratableCollectSettings {
+  /**
+   * Folders whose whole hierarchy travels as one attachment. Entries use the same path-or-regular-expression
+   * syntax as the settings tab.
+   */
+  readonly attachmentUnitFolderPaths?: readonly string[];
+
+  /**
+   * What `Collect attachments` does with an attachment several notes reference.
+   */
+  readonly collectAttachmentUsedByMultipleNotesMode?: CollectAttachmentUsedByMultipleNotesMode;
+
+  /**
+   * Paths whose attachments `Collect attachments` leaves where they are.
+   */
+  readonly excludePathsFromAttachmentCollecting?: readonly string[];
+
+  /**
+   * What `Move attachment to proper folder` does with an attachment several notes reference.
+   */
+  readonly moveAttachmentToProperFolderUsedByMultipleNotesMode?: MoveAttachmentToProperFolderUsedByMultipleNotesMode;
+
+  /**
+   * Whether a note's attachments are collected each time the note changes.
+   */
+  readonly shouldCollectAttachmentsAutomatically?: boolean;
+}
+
+/**
+ * Parameters for {@link CustomAttachmentLocationApi.migrateSettings}.
+ */
+export interface MigrateSettingsParams {
+  /**
+   * The values the calling plugin proposes.
+   */
+  readonly proposedSettings: MigratableCollectSettings;
+
+  /**
+   * The `manifest.id` of the plugin making the proposal. The dialog names that plugin, so the user knows whose
+   * settings they are being offered.
+   */
+  readonly sourcePluginId: string;
+}
+
+/**
+ * The outcome of {@link CustomAttachmentLocationApi.migrateSettings}.
+ */
+export interface MigrateSettingsResult {
+  /**
+   * Whether the user approved the migration. `false` means they cancelled and nothing was written, so the
+   * caller must keep its proposal pending rather than record the handover as done.
+   */
+  readonly isApplied: boolean;
+}
+
+/**
+ * What `Move attachment to proper folder` does with an attachment several notes reference. The same spellings
+ * the settings file stores.
+ */
+export type MoveAttachmentToProperFolderUsedByMultipleNotesMode = 'Cancel' | 'CopyAll' | 'Prompt' | 'Skip';
 
 /**
  * Parameters for {@link CustomAttachmentLocationApi.getProperAttachmentPath}.

@@ -12,11 +12,12 @@ Consequences for anyone touching the tests:
 - **Unit tests publish a stand-in API.** `src/plugin.test.ts` publishes an empty API for the dependency in `beforeEach`; without it the gate never opens and nothing past the base loads. `unpublishProviderApi()` withdraws it, which is how the blocked path and the surface teardown are tested.
 - **`onloadImpl` runs again each time the gate reopens.** Anything it stores outside its children has to be reset when the surface unloads — `attachmentCollector` and `pluginApi` both are, because `collectAttachmentsInAbstractFiles` and the published API are reachable from outside and would otherwise drive torn-down components.
 
-## The published API is non-interactive, and a new interactive token must say so
+## The published reads are non-interactive, and a new interactive token must say so
 
 `src/plugin-api-impl.ts` answers a consumer's questions by driving the same `AttachmentPathManager` the commands drive, under `ActionContext.ReadApi`. That context exists for one reason: **a read has no user to ask.** A consumer auditing a whole vault calls `getAttachmentFolderPath` once per note, and a folder template holding `${prompt}` would raise one dialog per note.
 
 - **A token that would open anything must gate on `isNonInteractiveActionContext`** (`src/token-evaluator-context.ts`), not on `ActionContext.ValidateTokens` by name. `prompt-token.ts` is the only such token today and is the worked example; naming the context directly is how the next one silently starts prompting an audit.
+- **`migrateSettings` is the one member that asks, and it asks through its OWN dialog, never through a token.** It receives the collect settings Consistent Attachments and Links hands over, and the user approves them in `src/modals/collect-settings-migration-modal.ts`. It never evaluates a template, so it gives `${prompt}` no way in. Keep it that way: the non-interactive rule above is about the READS.
 - **`ActionContext.ReadApi` falls into every `default:` branch** in `attachment-path-manager.ts`, so a read answers about the NEW-attachment destination (`attachmentFolderPath`) and the ordinary generated file name. That is deliberate and is what `api.d.ts` promises. The collect destination (`collectedAttachmentFolderPath`) is a different question and is not published yet.
 
 ## `api.d.ts` at the repo root is the whole published surface, and it imports `obsidian` alone

@@ -17,6 +17,7 @@ import {
 } from 'obsidian-dev-utils/obsidian/attachment-path';
 import { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 import {
+  getAbstractFileOrNull,
   getFileOrNull,
   getPath,
   isNote
@@ -80,6 +81,7 @@ vi.mock('obsidian-dev-utils/obsidian/attachment-path', async (importOriginal) =>
 
 vi.mock('obsidian-dev-utils/obsidian/file-system', async (importOriginal) => ({
   ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/file-system')>(),
+  getAbstractFileOrNull: vi.fn<typeof getAbstractFileOrNull>(),
   getFileOrNull: vi.fn<typeof getFileOrNull>(),
   getPath: vi.fn<typeof getPath>(),
   isNote: vi.fn<typeof isNote>()
@@ -107,6 +109,7 @@ vi.mock('./prompt-with-preview-modal.ts', async (importOriginal) => ({
 }));
 
 const mockGetAvailablePathForAttachments = vi.mocked(getAvailablePathForAttachments);
+const mockGetAbstractFileOrNull = vi.mocked(getAbstractFileOrNull);
 const mockGetFileOrNull = vi.mocked(getFileOrNull);
 const mockGetPath = vi.mocked(getPath);
 const mockIsNote = vi.mocked(isNote);
@@ -161,6 +164,7 @@ function createManager(): TestContext {
     attachmentFolderPath: 'assets',
     collectedAttachmentFileName: '',
     collectedAttachmentFolderPath: '',
+    duplicateNameSeparator: ' ',
     generatedAttachmentFileName: 'generated',
     renamedAttachmentFileName: '',
     shouldFollowObsidianAttachmentLocation: false,
@@ -253,6 +257,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   noticeInstances.length = 0;
+  mockGetAbstractFileOrNull.mockReturnValue(null);
   mockGetFileOrNull.mockReturnValue(null);
   mockGetPath.mockImplementation((_app, pathOrFile) => typeof pathOrFile === 'string' ? pathOrFile : castTo<TFile>(pathOrFile).path);
   mockIsNote.mockReturnValue(true);
@@ -694,6 +699,60 @@ describe('AttachmentPathManager', () => {
         sequenceNumber: 0
       });
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getProperAttachmentPath, for an attachment parked under a duplicate suffix', () => {
+    function createParkedFile(basename: string): TFile {
+      return createTFile({
+        basename,
+        extension: 'png',
+        name: `${basename}.png`,
+        path: `assets/${basename}.png`,
+        stat: strictProxy<FileStats>({ ctime: 0, mtime: 0, size: 0 })
+      });
+    }
+
+    async function getProperPath(attachmentFile: TFile): Promise<null | string> {
+      return await context.manager.getProperAttachmentPath({
+        actionContext: ActionContext.CollectAttachments,
+        attachmentFile,
+        noteFilePath: 'note.md',
+        reference: castTo<Reference>({ link: 'x', original: 'x' }),
+        sequenceNumber: 0
+      });
+    }
+
+    beforeEach(() => {
+      context.settings.shouldRenameCollectedAttachments = true;
+      context.settings.collectedAttachmentFileName = 'img';
+      context.settings.attachmentFolderPath = 'assets';
+    });
+
+    it('should leave it where it is while another file holds the proper path, so auto-collect converges', async () => {
+      mockGetAbstractFileOrNull.mockReturnValue(createTFile({ path: 'assets/img.png' }));
+
+      await expect(getProperPath(createParkedFile('img 1'))).resolves.toBeNull();
+      expect(mockGetAbstractFileOrNull).toHaveBeenCalledWith(expect.objectContaining({ pathOrFile: 'assets/img.png' }));
+    });
+
+    it('should move it onto the proper path once that path is free', async () => {
+      await expect(getProperPath(createParkedFile('img 1'))).resolves.toBe('assets/img.png');
+    });
+
+    it('should honour the configured duplicate separator', async () => {
+      context.settings.duplicateNameSeparator = '_';
+      mockGetAbstractFileOrNull.mockReturnValue(createTFile({ path: 'assets/img.png' }));
+
+      await expect(getProperPath(createParkedFile('img_2'))).resolves.toBeNull();
+      await expect(getProperPath(createParkedFile('img 2'))).resolves.toBe('assets/img.png');
+    });
+
+    it('should move a file whose name is not the proper name plus a suffix', async () => {
+      mockGetAbstractFileOrNull.mockReturnValue(createTFile({ path: 'assets/img.png' }));
+
+      await expect(getProperPath(createParkedFile('photo 1'))).resolves.toBe('assets/img.png');
+      await expect(getProperPath(createParkedFile('img copy'))).resolves.toBe('assets/img.png');
     });
   });
 

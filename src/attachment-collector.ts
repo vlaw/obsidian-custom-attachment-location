@@ -17,6 +17,7 @@ import {
   Vault
 } from 'obsidian';
 import { abortSignalAny } from 'obsidian-dev-utils/abort-controller';
+import { noop } from 'obsidian-dev-utils/function';
 import {
   createElAsync,
   createFragmentAsync
@@ -151,6 +152,14 @@ interface CollectAttachmentContext {
   isAborted?: boolean;
 
   /**
+   * Whether this run was started by an edit to the note rather than by the user, which happens when
+   * `Collect attachments automatically` is on.
+   *
+   * Such a run shows no progress notice, because it repeats on every save of the note.
+   */
+  isAutomaticRun?: boolean;
+
+  /**
    * Whether this run targets a single note - the `Collect attachments in current note` command.
    *
    * It is the condition every per-note REPORT hangs off, rather than a flag per report, because they
@@ -195,6 +204,32 @@ export class AttachmentCollector {
       app: params.app,
       handedOverSettingsComponent: params.handedOverSettingsComponent,
       pluginSettingsComponent: params.pluginSettingsComponent
+    });
+  }
+
+  /**
+   * Collects the attachments of a note that has just changed, for `Collect attachments automatically`.
+   *
+   * Queued like the commands, so it cannot interleave with a collect the user started. A note this plugin
+   * leaves alone is skipped without the notice the command shows, since nobody asked for this run.
+   *
+   * @param note - The note that changed.
+   */
+  public collectAttachmentsAutomatically(note: TFile): void {
+    if (this.handedOverSettingsComponent.isPathIgnored(note.path)) {
+      return;
+    }
+
+    addToQueue({
+      abortSignal: this.abortSignalComponent.abortSignal,
+      operationFunction: (abortSignal) =>
+        this.collectAttachments({
+          abortSignal,
+          context: { isAutomaticRun: true },
+          note
+        }),
+      operationName: t(($) => $.menuItems.collectAttachmentsInFile),
+      timeoutInMilliseconds: this.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
     });
   }
 
@@ -302,9 +337,7 @@ export class AttachmentCollector {
       return;
     }
 
-    const notice = this.pluginNoticeComponent.showNotice(t(($) => $.notice.collectingAttachments, { noteFilePath: params.note.path }), {
-      isPermanent: true
-    });
+    const hideCollectingNotice = this.showCollectingNotice(params.context, params.note.path);
 
     try {
       const isCanvas = isCanvasFile(params.note);
@@ -718,7 +751,7 @@ export class AttachmentCollector {
         notePath: params.note.path
       });
     } finally {
-      notice.hide();
+      hideCollectingNotice();
     }
   }
 
@@ -1021,6 +1054,29 @@ export class AttachmentCollector {
    * toward NOT moving, since a false positive merely leaves it un-collected while a false negative
    * could relocate a still-used attachment and lose it. Does NOT rewrite the non-standard reference.
    */
+  /**
+   * Shows the notice that stays up while a note is being collected.
+   *
+   * An automatic run shows none. It fires on every save of the note, so a permanent notice would flash on each
+   * one, and the user did not ask for this run and is not waiting for it.
+   *
+   * @param context - The run's context.
+   * @param notePath - The note being collected.
+   * @returns What hides the notice again.
+   */
+  private showCollectingNotice(context: CollectAttachmentContext, notePath: string): () => void {
+    if (context.isAutomaticRun) {
+      return noop;
+    }
+
+    const notice = this.pluginNoticeComponent.showNotice(t(($) => $.notice.collectingAttachments, { noteFilePath: notePath }), {
+      isPermanent: true
+    });
+    return () => {
+      notice.hide();
+    };
+  }
+
   private async skipAttachmentReferencedByRawPath(params: AttachmentCollectorSkipAttachmentReferencedByRawPathParams): Promise<boolean> {
     if (!this.pluginSettingsComponent.settings.shouldSkipCollectingAttachmentsReferencedByRawPath) {
       return false;

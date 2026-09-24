@@ -544,6 +544,10 @@ export const defaultTranslations = {
       message: 'Are you sure you want to reset the custom tokens to the sample custom tokens? Your changes will be lost.',
       title: 'Reset to sample custom tokens'
     },
+    shouldCollectAttachmentsAutomatically: {
+      description: 'Collect a note\'s attachments each time the note changes, as if Collect attachments in current note had been run on it. This moves files without asking, on every save of the note, so it is off by default.',
+      name: 'Collect attachments automatically'
+    },
     shouldConvertPastedImagesToJpeg: {
       description: 'Whether to convert pasted images to JPEG. Applies only when the PNG image content is pasted from the clipboard directly. Typically, for pasting screenshots.',
       name: 'Should convert pasted images to JPEG'
@@ -632,5 +636,17 @@ export const defaultTranslations = {
         part5: 'for migration details.'
       }
     }
+  },
+  settingsMigrationModal: {
+    currentValue: 'Currently: {{value}}',
+    disabled: 'Disabled',
+    emptyList: '(empty)',
+    enabled: 'Enabled',
+    explanation: {
+      part1: '{{sourcePluginName}} used to collect attachments itself and no longer does. It proposes the settings it held, so this vault keeps behaving the way it did.',
+      part2: 'Each row shows what this plugin holds now and what is proposed. Edit a suggested value, or reset a row to keep the current one. Nothing is written until you press OK.'
+    },
+    resetTooltip: 'Reset to the current value, leaving this setting as it is',
+    title: 'Settings proposed by {{sourcePluginName}}'
   }
 } as const satisfies DefaultTranslationsBase;

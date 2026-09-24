@@ -89,7 +89,25 @@ This plugin patches that call, which makes it look like the seam you want. It is
 
 `getAttachmentFolderPath` is the read, asked once per note. It answers `null` when this plugin leaves that note alone entirely, which is your cue to fall back to Obsidian's own `attachmentFolderPath` — a different answer from this plugin not being installed, and deliberately so.
 
-Both members arrived in contract version `1.0.0`, and both are asynchronous: an attachment folder is the result of evaluating a user-written template whose tokens can read the note's frontmatter and the attachment's bytes, so there is no synchronous answer to hand back. Neither ever asks the user anything, so a whole-vault audit raises no dialogs.
+Both reads arrived in contract version `1.0.0`, and both are asynchronous: an attachment folder is the result of evaluating a user-written template whose tokens can read the note's frontmatter and the attachment's bytes, so there is no synchronous answer to hand back. Neither ever asks the user anything, so a whole-vault audit raises no dialogs.
+
+### Handing collect settings over
+
+A plugin that used to collect attachments itself hands its settings over through `migrateSettings`, added in contract version `1.1.0`, so ask for `'^1.1.0'`. It proposes the values it held, and this plugin shows the user each one that would change next to the value it holds now. Nothing is written unless the user approves, and `isApplied: false` means they cancelled, so keep the proposal pending. `api.d.ts` lists the settings that can be proposed. The shape matches `obsidian-dev-utils`' `SettingsMigrationApi`, so its `SettingsMigrationComponent` can run the whole offer:
+
+```ts
+this.addChild(new SettingsMigrationComponent<MigratableCollectSettings>({
+  apiVersionRange: '^1.1.0',
+  app,
+  getProposedSettings: () => settingsComponent.settings.proposedCollectSettings,
+  pluginSettingsComponent: settingsComponent,
+  providerPluginId: 'obsidian-custom-attachment-location',
+  retireProposedSettings: () => settingsComponent.editAndSave((settings) => {
+    settings.proposedCollectSettings = null;
+  }),
+  sourcePluginId: this.manifest.id
+}));
+```
 
 ## Installation
 

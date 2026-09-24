@@ -10,9 +10,14 @@
 import type { PluginApiContract } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
 
 export type {
+  CollectAttachmentUsedByMultipleNotesMode,
   CustomAttachmentLocationApi,
   GetAttachmentFolderPathParams,
-  GetProperAttachmentPathParams
+  GetProperAttachmentPathParams,
+  MigratableCollectSettings,
+  MigrateSettingsParams,
+  MigrateSettingsResult,
+  MoveAttachmentToProperFolderUsedByMultipleNotesMode
 } from '../api.d.ts';
 
 /**
@@ -21,15 +26,16 @@ export type {
  */
 export const PLUGIN_API_CONTRACT: PluginApiContract = {
   getAttachmentFolderPath: {},
-  getProperAttachmentPath: {}
+  getProperAttachmentPath: {},
+  migrateSettings: {}
 };
 
 /**
  * The version of the contract above — independent of the plugin's own version, so a consumer asks for `'^1'`
  * and keeps working across releases that change nothing it depends on.
  *
- * `1.0.0` is the pair of per-note reads. The surface is deliberately one API rather than one per question:
- * the collect-settings migration and the attachment-collecting call this plugin already offers by hand are
- * to become members here, which is an additive minor each time and nothing a consumer of `'^1'` notices.
+ * `1.0.0` is the pair of per-note reads. `1.1.0` adds `migrateSettings`, which receives the collect settings
+ * Consistent Attachments and Links hands over when it stops collecting. That is purely additive, so a consumer
+ * of the reads keeps asking for `'^1'`, and a consumer of the migration asks for `'^1.1.0'`.
  */
-export const PLUGIN_API_VERSION = '1.0.0';
+export const PLUGIN_API_VERSION = '1.1.0';

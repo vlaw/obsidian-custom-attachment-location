@@ -31,6 +31,7 @@ import { ArrayBufferMap } from './array-buffer-map.ts';
 import { AttachmentCollector } from './attachment-collector.ts';
 import { AttachmentPathManager } from './attachment-path-manager.ts';
 import { AttachmentSaver } from './attachment-saver.ts';
+import { AutomaticAttachmentCollectorComponent } from './automatic-attachment-collector-component.ts';
 import { CollectAttachmentsEntireVaultCommandHandler } from './command-handlers/collect-attachments-entire-vault-command-handler.ts';
 import { CollectAttachmentsInCurrentFolderCommandHandler } from './command-handlers/collect-attachments-in-current-folder-command-handler.ts';
 import { CollectAttachmentsInFileCommandHandler } from './command-handlers/collect-attachments-in-file-command-handler.ts';
@@ -281,6 +282,14 @@ export class Plugin extends PluginBase {
     });
     this.attachmentCollector = attachmentCollector;
 
+    this.addChild(
+      new AutomaticAttachmentCollectorComponent({
+        app: this.app,
+        attachmentCollector,
+        pluginSettingsComponent
+      })
+    );
+
     // Unloads with the feature surface, which goes whenever the dependency goes away — and this method runs
     // Again when it comes back. Whatever this method leaves outside its own children is undone here.
     const featureSurfaceLifetimeComponent = this.addChild(new Component());
@@ -298,7 +307,8 @@ export class Plugin extends PluginBase {
     this.pluginApi = new PluginApiImpl({
       app: this.app,
       attachmentPathManager,
-      handedOverSettingsComponent
+      handedOverSettingsComponent,
+      pluginSettingsComponent
     });
     featureSurfaceLifetimeComponent.register(() => {
       this.pluginApi = null;

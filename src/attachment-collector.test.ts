@@ -460,6 +460,38 @@ describe('AttachmentCollector', () => {
     });
   });
 
+  describe('collectAttachmentsAutomatically', () => {
+    it('should skip a note this plugin leaves alone without telling the user, since nobody asked', () => {
+      vi.mocked(settings.isPathIgnored).mockReturnValue(true);
+      const showNoticeSpy = vi.spyOn(pluginNoticeComponent, 'showNotice');
+
+      collector.collectAttachmentsAutomatically(createFile('ignored.md'));
+
+      expect(mockAddToQueue).not.toHaveBeenCalled();
+      expect(showNoticeSpy).not.toHaveBeenCalled();
+    });
+
+    it('should collect the note without a progress notice, which would flash on every save', async () => {
+      const note = createFile('note.md');
+      mockIsCanvasFile.mockReturnValue(false);
+      mockGetCacheSafe.mockResolvedValue(strictProxy<CachedMetadataEx>({}));
+      mockGetLinks.mockReturnValue([createReference()]);
+      mockExtractLinkFile.mockReturnValue(createFile('img.png'));
+      mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks(['note.md']));
+      mockRenameSafe.mockResolvedValue('attachments/img.png');
+      const showNoticeSpy = vi.spyOn(pluginNoticeComponent, 'showNotice');
+
+      collector.collectAttachmentsAutomatically(note);
+      const params = castTo<QueueParamsLike>(mockAddToQueue.mock.calls[0]?.[0]);
+      expect(params.operationName).toBe('Collect attachments in file');
+      await params.operationFunction(new AbortController().signal);
+
+      expect(mockRenameSafe).toHaveBeenCalled();
+      expect(mockLoop).not.toHaveBeenCalled();
+      expect(showNoticeSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('collectAttachments (via queue operationFunction)', () => {
     let note: TFile;
 
