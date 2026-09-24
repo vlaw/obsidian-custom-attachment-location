@@ -469,10 +469,15 @@ export class AttachmentPathManager {
      * NAME in `getGeneratedAttachmentFileBaseName`, so a user who never opens this setting sees no change.
      */
     const settings = this.pluginSettingsComponent.settings;
-    const template = substitutions.actionContext === ActionContext.CollectAttachments
-      ? settings.collectedAttachmentFolderPath || settings.attachmentFolderPath
-      : settings.attachmentFolderPath;
-    return await this.resolvePathTemplate({ isFileNamePart: false, substitutions, template });
+    if (substitutions.actionContext === ActionContext.CollectAttachments && settings.collectedAttachmentFolderPath) {
+      return await this.resolvePathTemplate({ isFileNamePart: false, substitutions, template: settings.collectedAttachmentFolderPath });
+    }
+
+    if (settings.shouldFollowObsidianAttachmentLocation) {
+      return this.getObsidianAttachmentFolderPath(substitutions.noteFolderPath);
+    }
+
+    return await this.resolvePathTemplate({ isFileNamePart: false, substitutions, template: settings.attachmentFolderPath });
   }
 
   private async getCursorLineAndSequenceNumber(noteFilePath: string, oldAttachmentPathOrFile: PathOrFile): Promise<CursorLineAndSequenceNumber> {
@@ -489,6 +494,35 @@ export class AttachmentPathManager {
       cursorLine,
       sequenceNumber: sequenceNumberByAttachmentPath.get(oldAttachmentFile.path) ?? 0
     };
+  }
+
+  /**
+   * Resolves Obsidian's own *Default location for new attachments* for a note, the way Obsidian does.
+   *
+   * Deliberately NOT routed through {@link resolvePathTemplate}: the value is a folder the user typed into
+   * Obsidian, not a template, so a `${` in it is a folder name rather than a token, and the special-character
+   * cleaning must not rename a folder Obsidian itself would use as-is.
+   *
+   * The four shapes the setting stores are the vault root (`/`), a fixed folder (`assets`), the note's own
+   * folder (`./`), and a subfolder of it (`./attachments`).
+   *
+   * @param noteFolderPath - The note's folder, `''` for the vault root.
+   * @returns The attachment folder, `''` for the vault root.
+   */
+  private getObsidianAttachmentFolderPath(noteFolderPath: string): string {
+    const configuredValue = this.app.vault.getConfig('attachmentFolderPath');
+    const configuredPath = typeof configuredValue === 'string' ? configuredValue : '';
+    let folderPath: string;
+    if (configuredPath === '.' || configuredPath === './') {
+      folderPath = noteFolderPath;
+    } else if (configuredPath.startsWith('./')) {
+      folderPath = join(noteFolderPath, configuredPath.slice('./'.length));
+    } else {
+      folderPath = configuredPath;
+    }
+
+    // Obsidian's `normalizePath` spells the vault root `/`; this plugin spells it `''`.
+    return normalizePath(folderPath).replace(/^\/$/, '');
   }
 
   private isGeneratedAttachmentFileNameSkipped(context: AttachmentPathContext, shouldSkipGeneratedAttachmentFileName: boolean | undefined): boolean {

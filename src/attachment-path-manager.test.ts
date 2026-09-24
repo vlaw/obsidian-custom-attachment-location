@@ -130,6 +130,7 @@ interface TestContext {
   exists: ReturnType<typeof vi.fn<Vault['exists']>>;
   getAvailablePath: ReturnType<typeof vi.fn<Vault['getAvailablePath']>>;
   getAvailablePathForAttachmentsOriginal: ReturnType<typeof vi.fn<Vault['getAvailablePathForAttachments']>>;
+  getConfig: ReturnType<typeof vi.fn<(name: string) => unknown>>;
   handedOverSettings: MutableHandedOverSettings;
   isNoteEx: ReturnType<typeof vi.fn<PluginSettingsComponent['isNoteEx']>>;
   isPathIgnored: ReturnType<typeof vi.fn<HandedOverSettingsComponent['isPathIgnored']>>;
@@ -162,6 +163,7 @@ function createManager(): TestContext {
     collectedAttachmentFolderPath: '',
     generatedAttachmentFileName: 'generated',
     renamedAttachmentFileName: '',
+    shouldFollowObsidianAttachmentLocation: false,
     shouldRenameCollectedAttachments: false,
     specialCharacters: '',
     specialCharactersReplacement: '-'
@@ -172,11 +174,13 @@ function createManager(): TestContext {
   const readBinary = vi.fn<Vault['readBinary']>().mockResolvedValue(new ArrayBuffer(0));
   const getAvailablePath = vi.fn<Vault['getAvailablePath']>().mockImplementation((path, extension) => extension ? `${path}.${extension}` : path);
   const getAvailablePathForAttachmentsOriginal = vi.fn<Vault['getAvailablePathForAttachments']>().mockResolvedValue('original-path');
+  const getConfig = vi.fn<(name: string) => unknown>().mockReturnValue('/');
 
   const vault = strictProxy<Vault>({
     create,
     exists,
     getAvailablePath,
+    getConfig: castTo<Vault['getConfig']>(getConfig),
     readBinary
   });
 
@@ -213,6 +217,7 @@ function createManager(): TestContext {
     exists,
     getAvailablePath,
     getAvailablePathForAttachmentsOriginal,
+    getConfig,
     handedOverSettings,
     isNoteEx,
     isPathIgnored,
@@ -305,6 +310,59 @@ describe('AttachmentPathManager', () => {
         notePath: 'notes/note.md'
       });
       expect(result).toBe('_Attachments');
+    });
+
+    describe('when following Obsidian\'s own attachment location', () => {
+      async function resolveFor(configuredPath: unknown, notePath = 'notes/note.md', actionContext = ActionContext.SaveAttachment): Promise<string> {
+        context.settings.shouldFollowObsidianAttachmentLocation = true;
+        context.getConfig.mockReturnValue(configuredPath);
+        return await context.manager.getAttachmentFolderFullPathForPath({
+          actionContext,
+          attachmentFileName: 'img.png',
+          notePath
+        });
+      }
+
+      it('should resolve each of the four Obsidian modes the way Obsidian does', async () => {
+        expect(await resolveFor('/')).toBe('');
+        expect(await resolveFor('assets')).toBe('assets');
+        expect(await resolveFor('./')).toBe('notes');
+        expect(await resolveFor('.')).toBe('notes');
+        expect(await resolveFor('./attachments')).toBe('notes/attachments');
+        expect(context.getConfig).toHaveBeenCalledWith('attachmentFolderPath');
+      });
+
+      it('should resolve the note-relative modes for a note in the vault root', async () => {
+        expect(await resolveFor('./', 'note.md')).toBe('');
+        expect(await resolveFor('./attachments', 'note.md')).toBe('attachments');
+      });
+
+      it('should not run the template machinery over a folder name the user typed into Obsidian', async () => {
+        context.settings.specialCharacters = '#';
+        // eslint-disable-next-line no-template-curly-in-string -- A literal folder name that merely looks like a token.
+        const folderName = 'Media #1/${noteFileName}';
+        expect(await resolveFor(folderName)).toBe(folderName);
+        expect(context.validatePath).not.toHaveBeenCalled();
+      });
+
+      it('should treat a missing Obsidian setting as the vault root', async () => {
+        expect(await resolveFor(undefined)).toBe('');
+      });
+
+      it('should ignore the template while the mode is on', async () => {
+        context.settings.attachmentFolderPath = '_Attachments';
+        expect(await resolveFor('./attachments')).toBe('notes/attachments');
+      });
+
+      it('should let an explicit collected-attachment folder win for collecting', async () => {
+        context.settings.collectedAttachmentFolderPath = './exported';
+        expect(await resolveFor('./attachments', 'notes/note.md', ActionContext.CollectAttachments)).toBe('notes/exported');
+      });
+
+      it('should collect into Obsidian\'s location when no collected-attachment folder is set', async () => {
+        context.settings.collectedAttachmentFolderPath = '';
+        expect(await resolveFor('./attachments', 'notes/note.md', ActionContext.CollectAttachments)).toBe('notes/attachments');
+      });
     });
 
     it('should leave every other action context on the new attachment folder path', async () => {

@@ -170,6 +170,21 @@ export class PluginSettings {
 
   public renameAttachmentsCreatedByOtherPluginsMode: RenameAttachmentsCreatedByOtherPluginsMode = RenameAttachmentsCreatedByOtherPluginsMode.None;
   public renamedAttachmentFileName = '';
+
+  /**
+   * Whether a new attachment goes wherever Obsidian's own *Default location for new attachments* says.
+   *
+   * On, {@link attachmentFolderPath} is not consulted at all: the folder is Obsidian's setting, resolved the
+   * way Obsidian resolves it, and Obsidian's setting page stays the one place that decides. It is kept rather
+   * than cleared, so turning the mode off again restores the template the user had.
+   *
+   * A flag rather than a sentinel value inside the template, so a template can never be mistaken for the mode
+   * and the mode can never destroy the template. Only the FOLDER follows Obsidian; the file-name settings
+   * still apply. An explicit {@link collectedAttachmentFolderPath} still wins for the collecting commands, as
+   * it does over the template.
+   */
+  public shouldFollowObsidianAttachmentLocation = false;
+
   public shouldPreserveImageMetadata = false;
   public shouldRenameCollectedAttachments = false;
   public shouldSetLinkDisplayTextToAttachmentFileName = false;
