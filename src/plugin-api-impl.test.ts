@@ -232,6 +232,16 @@ describe('PluginApiImpl', () => {
       }));
     });
 
+    it('should fall back to sequence number 0 when the note numbers no such attachment', async () => {
+      getSequenceNumberMap.mockResolvedValue(new Map());
+
+      await pluginApi.getProperAttachmentPath({ attachmentPathOrFile: ATTACHMENT_FILE.path, notePath: NOTE_PATH });
+
+      expect(getProperAttachmentPath).toHaveBeenCalledWith(expect.objectContaining({
+        sequenceNumber: 0
+      }));
+    });
+
     it('should answer with null for a path no file answers to', async () => {
       mockGetFileOrNull.mockReturnValue(null);
 
