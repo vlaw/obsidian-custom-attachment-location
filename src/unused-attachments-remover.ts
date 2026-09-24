@@ -605,6 +605,29 @@ export class UnusedAttachmentsRemover {
   }
 
   /**
+   * Whether any of the files is a real note with something written in it.
+   *
+   * Only notes are read, so a unit made of attachments alone costs no reads at all.
+   *
+   * @param files - The files to check.
+   * @returns `true` when at least one of them is a note whose text is not blank.
+   */
+  private async hasNoteWithContent(files: TFile[]): Promise<boolean> {
+    for (const file of files) {
+      if (!this.pluginSettingsComponent.isNoteEx(file)) {
+        continue;
+      }
+
+      const content = await this.app.vault.cachedRead(file);
+      if (content.trim() !== '') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Decides which of a set of attachment candidates are unused, and which of their unit folders are.
    *
    * Shared by both passes, which differ only in how they FOUND the candidates. The note-driven pass names
@@ -674,8 +697,12 @@ export class UnusedAttachmentsRemover {
        * per-file rule, which can only ever reach attachments. Note that this also spares a unit that
        * happens to contain the scanning note itself, and — for the attachment-driven pass, which has no
        * scanning note — any unit a live note lives in.
+       *
+       * A note with no content does not count. That is the `Untitled.md` Obsidian leaves behind when a
+       * note is created and never written in; trashing it loses nothing, and letting it spare the unit left
+       * the whole folder behind for good (#83).
        */
-      if (unitFiles.some((unitFile) => this.pluginSettingsComponent.isNoteEx(unitFile))) {
+      if (await this.hasNoteWithContent(unitFiles)) {
         perFileCandidates.push(...unitCandidates);
         continue;
       }

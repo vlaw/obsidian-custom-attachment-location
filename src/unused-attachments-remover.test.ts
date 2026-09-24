@@ -204,6 +204,7 @@ describe('UnusedAttachmentsRemover', () => {
   let app: App;
   let attachmentFolder: TFolder;
   let attachmentPathManager: AttachmentPathManager;
+  let cachedRead: Mock<(file: TFile) => Promise<string>>;
   let getAttachmentFolderFullPathForPath: Mock<AttachmentPathManager['getAttachmentFolderFullPathForPath']>;
   let getFolderByPath: Mock<(path: string) => null | TFolder>;
   let pluginNoticeComponent: PluginNoticeComponent;
@@ -226,8 +227,10 @@ describe('UnusedAttachmentsRemover', () => {
     };
     attachmentFolder = strictProxy<TFolder>({ children: [], path: ATTACHMENT_FOLDER_PATH });
     getFolderByPath = vi.fn<(path: string) => null | TFolder>().mockReturnValue(attachmentFolder);
+    cachedRead = vi.fn<(file: TFile) => Promise<string>>().mockResolvedValue('');
     app = strictProxy<App>({
       vault: strictProxy<App['vault']>({
+        cachedRead: (file: TFile) => cachedRead(file),
         getAvailablePathForAttachments: createGetAvailablePathForAttachments(settings),
         getFolderByPath: (path: string) => getFolderByPath(path),
         getRoot: () => vaultRootFolder
@@ -594,10 +597,50 @@ describe('UnusedAttachmentsRemover', () => {
       const scratch = createFile(`${UNIT_FOLDER_PATH}/scratch.md`);
       unitMembers = [drawing, image, scratch];
       vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === scratch);
+      cachedRead.mockResolvedValue('Some notes.');
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
       // The folder survives; only the drawing, which nothing references at all, is trashed.
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, drawing);
+    });
+
+    it('should trash the whole unit folder when the only note inside it is empty', async () => {
+      // The `Untitled.md` Obsidian leaves behind when a note is created and never written in (#83).
+      const untitled = createFile(`${UNIT_FOLDER_PATH}/Untitled.md`);
+      unitMembers = [drawing, image, untitled];
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled);
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      expect(cachedRead).toHaveBeenCalledExactlyOnceWith(untitled);
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
+    it('should treat a note holding only whitespace as empty', async () => {
+      const blank = createFile(`${UNIT_FOLDER_PATH}/blank.md`);
+      unitMembers = [drawing, image, blank];
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === blank);
+      cachedRead.mockResolvedValue(' \n\t\n');
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
+    it('should keep the unit when an empty note sits beside one with content', async () => {
+      const untitled = createFile(`${UNIT_FOLDER_PATH}/Untitled.md`);
+      const scratch = createFile(`${UNIT_FOLDER_PATH}/scratch.md`);
+      unitMembers = [drawing, image, untitled, scratch];
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled || f === scratch);
+      cachedRead.mockImplementation((file) => Promise.resolve(file === scratch ? 'Some notes.' : ''));
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      // Per-file again: only the drawing, which nothing references, goes.
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, drawing);
+    });
+
+    it('should read no file when the unit holds attachments alone', async () => {
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      expect(cachedRead).not.toHaveBeenCalled();
     });
 
     it('should name the folder in the confirmation and say it goes whole', async () => {
