@@ -24,7 +24,17 @@ import {
  * `collect-attachments-exclusion.desktop.integration.test.ts` is desktop-only for the same reason.
  */
 
-interface ProbeResult {
+/**
+ * What following the orphan's link out of the confirmation dialog did (#87).
+ */
+interface LinkProbeResult {
+  readonly hasMinimizeButton: boolean;
+  readonly isMinimizedByLink: boolean;
+  readonly isOrphanLinked: boolean;
+  readonly isOrphanOpenedByLink: boolean;
+}
+
+interface ProbeResult extends LinkProbeResult {
   readonly commandDispatched: boolean;
   readonly modalShown: boolean;
   /**
@@ -69,7 +79,7 @@ describe('Delete unused attachments (issue #23)', () => {
         let refBacklinkCount = 0;
         let sharedBacklinkCount = 0;
         /*
-         * The four deadline loops in this closure run one after another and total 20s, under the transport's
+         * The deadline loops in this closure run one after another and total at most 22s, under the transport's
          * ~30s per-closure default. The project raises its command timeout past that, but only as a backstop:
          * spent, it would kill the call as a bare transport timeout during the third loop, and the fourth —
          * the one this test is about — would never get to report. Each waits for something that happens
@@ -115,13 +125,42 @@ describe('Delete unused attachments (issue #23)', () => {
 
         const isCommandDispatched = app.commands.executeCommandById('obsidian-custom-attachment-location:delete-unused-attachments-in-file');
 
-        // Drive the real confirmation modal: wait for it, then click its OK button.
+        /*
+         * Drive the real confirmation modal: wait for it, follow the orphan's link out of it (#87), then click
+         * its OK button. OK is clicked while the dialog is set aside, which is the path a user who went to
+         * look takes when they come back through the minimized bar.
+         */
+        async function followOrphanLink(okButton: Element): Promise<LinkProbeResult> {
+          const modalContainerEl = okButton.closest<HTMLElement>('.modal-container');
+          const orphanLinkEl = [...modalContainerEl?.querySelectorAll('a') ?? []].find((aEl) => aEl.textContent === orphanPath);
+          orphanLinkEl?.click();
+          // Minimizing hides the container, backdrop and all, rather than removing it.
+          const isMinimizedByLink = modalContainerEl?.style.display === 'none';
+          const openDeadline = Date.now() + 2000;
+          while (Date.now() < openDeadline && app.workspace.getActiveFile()?.path !== orphanPath) {
+            await sleep(100);
+          }
+          return {
+            hasMinimizeButton: Boolean(modalContainerEl?.querySelector('.minimize-button')),
+            isMinimizedByLink,
+            isOrphanLinked: Boolean(orphanLinkEl),
+            isOrphanOpenedByLink: app.workspace.getActiveFile()?.path === orphanPath
+          };
+        }
+
         let isModalShown = false;
+        let linkProbeResult: LinkProbeResult = {
+          hasMinimizeButton: false,
+          isMinimizedByLink: false,
+          isOrphanLinked: false,
+          isOrphanOpenedByLink: false
+        };
         const modalDeadline = Date.now() + 6000;
         while (Date.now() < modalDeadline) {
           const okButton = document.querySelector('.modal-container .ok-button');
           if (okButton) {
             isModalShown = true;
+            linkProbeResult = await followOrphanLink(okButton);
             (okButton as HTMLElement).click();
             break;
           }
@@ -140,6 +179,7 @@ describe('Delete unused attachments (issue #23)', () => {
         noticeObserver.disconnect();
 
         return {
+          ...linkProbeResult,
           commandDispatched: isCommandDispatched,
           modalShown: isModalShown,
           noticeTexts: [...noticeTexts],
@@ -164,6 +204,12 @@ describe('Delete unused attachments (issue #23)', () => {
       result.modalShown,
       `no confirmation modal; command dispatched: ${String(result.commandDispatched)}; notices: ${JSON.stringify(result.noticeTexts)}`
     ).toBe(true);
+
+    // #87: the dialog can be set aside, and what it lists can be opened from it.
+    expect(result.hasMinimizeButton).toBe(true);
+    expect(result.isOrphanLinked).toBe(true);
+    expect(result.isMinimizedByLink).toBe(true);
+    expect(result.isOrphanOpenedByLink).toBe(true);
 
     // Only the genuinely-unused attachment is trashed; the referenced and shared ones survive.
     expect(result.orphanTrashed).toBe(true);
