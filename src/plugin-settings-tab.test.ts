@@ -79,8 +79,8 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 33 = 32 setting rows + the overlap banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 33;
+// 34 = 33 setting rows + the overlap banner row that rides at the top.
+const EXPECTED_ROW_COUNT = 34;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
@@ -637,6 +637,31 @@ describe('PluginSettingsTab', () => {
     captured?.toggle.setValue(true);
     await waitForAllAsyncOperations();
     expect(refreshDomStateSpy).toHaveBeenCalled();
+  });
+
+  it('should re-evaluate the predicates when the follow-Obsidian toggle changes', async () => {
+    const { tab, toggles } = await createTab();
+
+    const refreshDomStateSpy = vi.fn();
+    tab.refreshDomState = refreshDomStateSpy;
+    const captured = toggles.find((entry) => entry.name === 'Follow Obsidian attachment location');
+    expect(captured).toBeDefined();
+    captured?.toggle.setValue(true);
+    await waitForAllAsyncOperations();
+    expect(refreshDomStateSpy).toHaveBeenCalled();
+  });
+
+  it('should hide the location template while the plugin follows Obsidian\'s own location', async () => {
+    const { names } = await createTab((settings) => {
+      settings.shouldFollowObsidianAttachmentLocation = true;
+    });
+    expect(names).toContain('Follow Obsidian attachment location');
+    expect(names).not.toContain('Location for new attachments');
+  });
+
+  it('should show the location template while the plugin uses its own template', async () => {
+    const { names } = await createTab();
+    expect(names).toContain('Location for new attachments');
   });
 
   it('should render the network image download timeout setting when downloading is enabled', async () => {

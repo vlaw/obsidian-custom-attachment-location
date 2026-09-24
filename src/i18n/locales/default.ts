@@ -46,6 +46,10 @@ export const defaultTranslations = {
     goToOwningNote: 'Go to owning note',
     moveAttachmentToProperFolder: 'Move attachment to proper folder'
   },
+  coreFilesSettingTab: {
+    controlledByPlugin: 'Controlled by Custom Attachment Location, so the value stored here is not in effect. To let this setting decide again, turn on Follow Obsidian attachment location in that plugin.',
+    openPluginSettings: 'Open'
+  },
   deleteUnusedAttachments: {
     confirm: {
       andMore: '... and {{count}} more.',
@@ -543,6 +547,10 @@ export const defaultTranslations = {
     shouldConvertPastedImagesToJpeg: {
       description: 'Whether to convert pasted images to JPEG. Applies only when the PNG image content is pasted from the clipboard directly. Typically, for pasting screenshots.',
       name: 'Should convert pasted images to JPEG'
+    },
+    shouldFollowObsidianAttachmentLocation: {
+      description: 'If enabled, new attachments go wherever Obsidian\'s own Files and links > Default location for new attachments says, and Location for new attachments below is not used. The file name settings still apply.',
+      name: 'Follow Obsidian attachment location'
     },
     shouldPreserveImageMetadata: {
       description: {
