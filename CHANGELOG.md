@@ -43,7 +43,7 @@
 
 - style(test): fix comment indentation in the attachment-rescue suite
 - fix(test): make the desktop integration suite deterministic
-- docs(test): repoint the bottleneck suite at T8-P4
+- docs(test): repoint the bottleneck suite's header comment, which named a file this repo does not have
 - fix(vitest): restore the performance project's global setup and CDP timeout
 - fix: re mnaoumov/obsidian-advanced-note-composer#259
 - fix(settings): point plugin-directory links at community.obsidian.md
