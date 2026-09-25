@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 13.1.0-beta.0
+
+- Merge tag '13.0.0' into develop
+- chore: release 12.1.0-beta.0
+- chore(cspell): whitelist lintable
+- Merge pull request #1 from vlaw/feat/md5-token
+- chore(cspell): whitelist vlaw
+- chore: untrack local AI agent tooling
+
 ## 13.0.0
 
 - docs(demo-vault): merge showing the Collect attachments automatically setting
