@@ -1,11 +1,31 @@
 # CHANGELOG
 
-## 12.1.0-beta.0
+## 13.0.0
 
-- chore(cspell): whitelist lintable
-- Merge pull request #1 from vlaw/feat/md5-token
-- chore(cspell): whitelist vlaw
-- chore: untrack local AI agent tooling
+- docs(demo-vault): merge showing the Collect attachments automatically setting
+- refactor(patches): merge keeping the core Files tab id file-local
+- test: merge covering the per-note read API branches
+- fix: merge no longer offering Move attachment to proper folder on a note
+- docs(contributing): merge basing PRs on main, the repo default branch
+- fix(screenshots): merge importing sharp by its default export in both capture suites
+- test(integration): merge the bounded vault cleanup and the dead-instance report
+- fix(delete-unused): merge keeping an attachment the note text links to, re #89
+- fix(rename-by-plugin): merge leaving an unlinked foreign file in place, re #88
+- feat(delete-unused): merge the linked, minimizable confirmation, re #87
+- fix(settings): merge the expanded Plugins picker, re #86
+- test: merge the desktop closure wait sizing
+- feat(api): merge the published collectAttachments member
+- test: merge the wait-ceiling sizing for the rescue and dependency suites
+- test(delete): merge the reporter's second #70 vault layout suite
+- fix(delete-unused): an empty note no longer keeps an attachment unit folder alive
+- fix: re #82
+- docs: say why every test vault seeds pattern mode now that a fresh install follows Obsidian
+- feat(location)!: follow Obsidian by default; switch it off to get ./assets/${noteFileName} back
+- feat(collect): receive the collect settings Consistent Attachments and Links hands over
+- feat(location): follow Obsidian's own attachment location on request
+- feat(collect): say when a collect moved nothing, and name the setting that pinned it
+- docs: replace two labels a reader of this repo cannot resolve
+- feat: publish a per-note attachment-folder read API for other plugins
 - refactor: read the attachment-unit-folder designation through the library
 - feat: exempt chosen attachment file types from the multiple notes check
 - feat: give Collect attachments a destination of its own
@@ -66,7 +86,7 @@
 
 - style(test): fix comment indentation in the attachment-rescue suite
 - fix(test): make the desktop integration suite deterministic
-- docs(test): repoint the bottleneck suite at T8-P4
+- docs(test): repoint the bottleneck suite's header comment, which named a file this repo does not have
 - fix(vitest): restore the performance project's global setup and CDP timeout
 - fix: re mnaoumov/obsidian-advanced-note-composer#259
 - fix(settings): point plugin-directory links at community.obsidian.md

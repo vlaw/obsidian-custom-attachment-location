@@ -16,6 +16,7 @@ import type {
 } from 'vitest';
 
 import { Vault } from 'obsidian';
+import { noopAsync } from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
 import { getCanvasReferences } from 'obsidian-dev-utils/obsidian/canvas';
 import { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
@@ -27,12 +28,12 @@ import {
 } from 'obsidian-dev-utils/obsidian/file-system';
 import { initI18N } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { extractLinkFile } from 'obsidian-dev-utils/obsidian/link';
+import { renderInternalLink } from 'obsidian-dev-utils/obsidian/markdown';
 import {
   getBacklinksForFileSafe,
   getCacheSafe,
   getLinks
 } from 'obsidian-dev-utils/obsidian/metadata-cache';
-import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
 import {
   cleanupEmptyFolders,
@@ -57,11 +58,16 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
 
 import { translationsMap } from './i18n/locales/translations-map.ts';
+import { confirmMinimizable } from './modals/minimizable-confirm-modal.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 interface QueueParamsLike {
   operationFunction(abortSignal: AbortSignal): Promise<void>;
   operationName: string;
+}
+
+interface RenderInternalLinkParamsLike {
+  readonly pathOrAbstractFile: string | TAbstractFile;
 }
 
 interface SettingsLike {
@@ -98,9 +104,19 @@ vi.mock('obsidian-dev-utils/obsidian/metadata-cache', async (importOriginal) => 
   getLinks: vi.fn()
 }));
 
-vi.mock('obsidian-dev-utils/obsidian/modals/confirm', async (importOriginal) => ({
-  ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/modals/confirm')>(),
-  confirm: vi.fn()
+// The real renderer goes through Obsidian's markdown renderer; a bare anchor naming the path is all the
+// Dialog's text needs.
+vi.mock('obsidian-dev-utils/obsidian/markdown', async (importOriginal) => ({
+  ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/markdown')>(),
+  renderInternalLink: vi.fn(async (params: RenderInternalLinkParamsLike) => {
+    await noopAsync();
+    const path = typeof params.pathOrAbstractFile === 'string' ? params.pathOrAbstractFile : params.pathOrAbstractFile.path;
+    return createEl('a', { text: path });
+  })
+}));
+
+vi.mock('./modals/minimizable-confirm-modal.ts', () => ({
+  confirmMinimizable: vi.fn()
 }));
 
 vi.mock('obsidian-dev-utils/obsidian/queue', async (importOriginal) => ({
@@ -123,7 +139,8 @@ const mockExtractLinkFile = vi.mocked(extractLinkFile);
 const mockGetBacklinksForFileSafe = vi.mocked(getBacklinksForFileSafe);
 const mockGetCacheSafe = vi.mocked(getCacheSafe);
 const mockGetLinks = vi.mocked(getLinks);
-const mockConfirm = vi.mocked(confirm);
+const mockConfirm = vi.mocked(confirmMinimizable);
+const mockRenderInternalLink = vi.mocked(renderInternalLink);
 const mockAddToQueue = vi.mocked(addToQueue);
 const mockCleanupEmptyFolders = vi.mocked(cleanupEmptyFolders);
 const mockTrashSafe = vi.mocked(trashSafe);
@@ -204,6 +221,7 @@ describe('UnusedAttachmentsRemover', () => {
   let app: App;
   let attachmentFolder: TFolder;
   let attachmentPathManager: AttachmentPathManager;
+  let cachedRead: Mock<(file: TFile) => Promise<string>>;
   let getAttachmentFolderFullPathForPath: Mock<AttachmentPathManager['getAttachmentFolderFullPathForPath']>;
   let getFolderByPath: Mock<(path: string) => null | TFolder>;
   let pluginNoticeComponent: PluginNoticeComponent;
@@ -226,8 +244,10 @@ describe('UnusedAttachmentsRemover', () => {
     };
     attachmentFolder = strictProxy<TFolder>({ children: [], path: ATTACHMENT_FOLDER_PATH });
     getFolderByPath = vi.fn<(path: string) => null | TFolder>().mockReturnValue(attachmentFolder);
+    cachedRead = vi.fn<(file: TFile) => Promise<string>>().mockResolvedValue('');
     app = strictProxy<App>({
       vault: strictProxy<App['vault']>({
+        cachedRead: (file: TFile) => cachedRead(file),
         getAvailablePathForAttachments: createGetAvailablePathForAttachments(settings),
         getFolderByPath: (path: string) => getFolderByPath(path),
         getRoot: () => vaultRootFolder
@@ -483,6 +503,84 @@ describe('UnusedAttachmentsRemover', () => {
       }
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unused);
     });
+
+    /*
+     * Issue #89. Obsidian's parser folds an embed that follows a math block opened right after a list
+     * into the math block, so the cache and the backlink index both miss it. The note's own text still
+     * names the file, and that is enough to keep it.
+     */
+    it('should keep an attachment the note text embeds when the cache misses the embed', async () => {
+      const image = createFile(`${ATTACHMENT_FOLDER_PATH}/test.png`);
+      cachedRead.mockResolvedValue('- Item\n$$\nx\n\n$$\n![[test.png]]\n');
+      mockExtractLinkFile.mockImplementation((params) => params.link.link === 'test.png' ? image : null);
+      const recurseSpy = vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
+        callback(image);
+      });
+      mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks([]));
+      try {
+        await runOperation([note]);
+      } finally {
+        recurseSpy.mockRestore();
+      }
+      expect(cachedRead).toHaveBeenCalledExactlyOnceWith(note);
+      expect(mockGetBacklinksForFileSafe).not.toHaveBeenCalled();
+      expect(mockTrashSafe).not.toHaveBeenCalled();
+      expect(showNoticeSpy).toHaveBeenCalledExactlyOnceWith('No unused attachments found.');
+    });
+
+    it('should not resolve an external link found in the note text', async () => {
+      cachedRead.mockResolvedValue('[site](https://example.com/test.png)\n');
+      await runOperation([note]);
+      expect(mockExtractLinkFile).not.toHaveBeenCalled();
+    });
+
+    it('should not read the text of a canvas note', async () => {
+      mockIsCanvasFile.mockReturnValue(true);
+      mockGetCanvasReferences.mockResolvedValue([]);
+      await runOperation([note]);
+      expect(cachedRead).not.toHaveBeenCalled();
+    });
+
+    describe('references from other scanned notes', () => {
+      let image: TFile;
+      let other: TFile;
+
+      beforeEach(() => {
+        image = createFile(`${ATTACHMENT_FOLDER_PATH}/test.png`);
+        other = createFile('other.md');
+        mockIsNote.mockImplementation((f) => f === note || f === other);
+        // Only the other note's text names the image, and the backlink index knows nothing of it.
+        cachedRead.mockImplementation((file) => Promise.resolve(file === other ? '![[test.png]]\n' : ''));
+        mockExtractLinkFile.mockImplementation((params) => params.link.link === 'test.png' ? image : null);
+        getAttachmentFolderFullPathForPath.mockImplementation((params) => Promise.resolve(params.notePath === note.path ? ATTACHMENT_FOLDER_PATH : 'none'));
+        getFolderByPath.mockImplementation((path) => path === ATTACHMENT_FOLDER_PATH ? attachmentFolder : null);
+        vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
+          callback(image);
+        });
+        mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks([]));
+        mockConfirm.mockResolvedValue(true);
+      });
+
+      it('should keep an attachment another scanned note names in its text', async () => {
+        await runOperation([note, other]);
+        expect(mockTrashSafe).not.toHaveBeenCalled();
+        expect(showNoticeSpy).toHaveBeenCalledExactlyOnceWith('No unused attachments found.');
+      });
+
+      it('should keep an attachment several other scanned notes name', async () => {
+        const third = createFile('third.md');
+        mockIsNote.mockImplementation((f) => [note, other, third].includes(castTo<TFile>(f)));
+        cachedRead.mockImplementation((file) => Promise.resolve(file === note ? '' : '![[test.png]]\n'));
+        await runOperation([note, other, third]);
+        expect(mockTrashSafe).not.toHaveBeenCalled();
+      });
+
+      it('should not let an excluded note keep another note\'s attachment', async () => {
+        vi.mocked(settings.isExcludedFromMultipleNotesCheck).mockImplementation((path) => path === other.path);
+        await runOperation([note, other]);
+        expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, image);
+      });
+    });
   });
 
   /*
@@ -572,6 +670,26 @@ describe('UnusedAttachmentsRemover', () => {
       expect(mockTrashSafe).not.toHaveBeenCalled();
     });
 
+    it('should keep the unit whole when only the text of a note outside it names a member (#89)', async () => {
+      const other = createFile('other.md');
+      mockIsNote.mockImplementation((f) => f === note || f === other);
+      cachedRead.mockImplementation((file) => Promise.resolve(file === other ? '![[img.png]]\n' : ''));
+      mockExtractLinkFile.mockImplementation((params) => params.link.link === 'img.png' ? image : null);
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note, other]);
+      expect(mockTrashSafe).not.toHaveBeenCalled();
+    });
+
+    it('should not let the text of a note inside the unit keep it alive', async () => {
+      // The drawing is an `.md`, so a wider scope scans it as a note — its embed of a sibling is still the unit describing itself.
+      mockIsNote.mockImplementation((f) => f === note || f === drawing);
+      cachedRead.mockImplementation((file) => Promise.resolve(file === drawing ? '![[img.png]]\n' : ''));
+      mockExtractLinkFile.mockImplementation((params) => params.link.link === 'img.png' ? image : null);
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note, drawing]);
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
     it('should keep the unit whole when a member is referenced from both inside and outside', async () => {
       // Guards against the inside-the-unit filter swallowing the outside hit alongside it.
       backlinksByPath.set(image.path, [drawing.path, 'other.md']);
@@ -594,10 +712,52 @@ describe('UnusedAttachmentsRemover', () => {
       const scratch = createFile(`${UNIT_FOLDER_PATH}/scratch.md`);
       unitMembers = [drawing, image, scratch];
       vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === scratch);
+      cachedRead.mockResolvedValue('Some notes.');
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
       // The folder survives; only the drawing, which nothing references at all, is trashed.
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, drawing);
+    });
+
+    it('should trash the whole unit folder when the only note inside it is empty', async () => {
+      // The `Untitled.md` Obsidian leaves behind when a note is created and never written in (#83).
+      const untitled = createFile(`${UNIT_FOLDER_PATH}/Untitled.md`);
+      unitMembers = [drawing, image, untitled];
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled);
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      // The scanning note is read for its links (#89); of the unit, only the note is read.
+      expect(cachedRead.mock.calls).toEqual([[note], [untitled]]);
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
+    it('should treat a note holding only whitespace as empty', async () => {
+      const blank = createFile(`${UNIT_FOLDER_PATH}/blank.md`);
+      unitMembers = [drawing, image, blank];
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === blank);
+      cachedRead.mockResolvedValue(' \n\t\n');
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
+    it('should keep the unit when an empty note sits beside one with content', async () => {
+      const untitled = createFile(`${UNIT_FOLDER_PATH}/Untitled.md`);
+      const scratch = createFile(`${UNIT_FOLDER_PATH}/scratch.md`);
+      unitMembers = [drawing, image, untitled, scratch];
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled || f === scratch);
+      cachedRead.mockImplementation((file) => Promise.resolve(file === scratch ? 'Some notes.' : ''));
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      // Per-file again: only the drawing, which nothing references, goes.
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, drawing);
+    });
+
+    it('should read no file of the unit when it holds attachments alone', async () => {
+      backlinksByPath.set(image.path, [drawing.path]);
+      await runOperation([note]);
+      // The one read is the scanning note's own, for its links (#89).
+      expect(cachedRead).toHaveBeenCalledExactlyOnceWith(note);
     });
 
     it('should name the folder in the confirmation and say it goes whole', async () => {
@@ -610,6 +770,8 @@ describe('UnusedAttachmentsRemover', () => {
       expect(text).toContain(UNIT_FOLDER_PATH);
       // No individual-file section at all, so the dialog cannot read as "0 attachments".
       expect(text).not.toContain('attachment(s) will be moved to the trash.');
+      // The folder itself is linked, so its folder note opens or the folder is revealed.
+      expect(mockRenderInternalLink).toHaveBeenCalledExactlyOnceWith({ app, pathOrAbstractFile: unitFolder, shouldRevealFile: true });
     });
 
     it('should trash a unit folder once when several notes reach it', async () => {
@@ -780,6 +942,15 @@ describe('UnusedAttachmentsRemover', () => {
       expect(text).toContain(unusedA.path);
       expect(text).toContain(unusedB.path);
       expect(text).not.toContain('... and');
+    });
+
+    it('should list every path as a link to the file it names', async () => {
+      // #87: the dialog is the last gate before a delete, so each entry has to be something the user can open.
+      mockConfirm.mockResolvedValue(false);
+      await runOperation([note]);
+      expect(mockRenderInternalLink).toHaveBeenCalledTimes(2);
+      expect(mockRenderInternalLink).toHaveBeenCalledWith({ app, pathOrAbstractFile: unusedA, shouldRevealFile: true });
+      expect(mockRenderInternalLink).toHaveBeenCalledWith({ app, pathOrAbstractFile: unusedB, shouldRevealFile: true });
     });
 
     it('should cap the list and summarize the rest', async () => {

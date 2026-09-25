@@ -5,6 +5,7 @@ import type {
   PluginGateComponent
 } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
+import type { PluginApiDeclaration } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
 
 import { Component } from 'obsidian';
 import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-demo-vault-command-handler';
@@ -30,6 +31,7 @@ import { ArrayBufferMap } from './array-buffer-map.ts';
 import { AttachmentCollector } from './attachment-collector.ts';
 import { AttachmentPathManager } from './attachment-path-manager.ts';
 import { AttachmentSaver } from './attachment-saver.ts';
+import { AutomaticAttachmentCollectorComponent } from './automatic-attachment-collector-component.ts';
 import { CollectAttachmentsEntireVaultCommandHandler } from './command-handlers/collect-attachments-entire-vault-command-handler.ts';
 import { CollectAttachmentsInCurrentFolderCommandHandler } from './command-handlers/collect-attachments-in-current-folder-command-handler.ts';
 import { CollectAttachmentsInFileCommandHandler } from './command-handlers/collect-attachments-in-file-command-handler.ts';
@@ -52,6 +54,11 @@ import { MarkdownUrlMap } from './markdown-url-map.ts';
 import { NetworkImageDownloader } from './network-image-downloader.ts';
 import { NoteOwnerResolver } from './note-owner-resolver.ts';
 import { AppSaveAttachmentPatchComponent } from './patches/app-save-attachment-patch-component.ts';
+import { PluginApiImpl } from './plugin-api-impl.ts';
+import {
+  PLUGIN_API_CONTRACT,
+  PLUGIN_API_VERSION
+} from './plugin-api.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { TokenValidator } from './token-validator.ts';
@@ -60,6 +67,7 @@ import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 export class Plugin extends PluginBase {
   private attachmentCollector: AttachmentCollector | null = null;
+  private pluginApi: null | PluginApiImpl = null;
 
   /**
    * Collects the attachments of the given notes into the folders the settings say they belong in,
@@ -77,6 +85,10 @@ export class Plugin extends PluginBase {
    *
    * The work is queued rather than awaited, matching the command, so this returns immediately.
    *
+   * Superseded by the published API's `collectAttachments`, declared in `api.d.ts`, versioned, and revoked when
+   * this plugin unloads, where this method is a duck-typed reach into the plugin instance. Kept, delegating to
+   * the same collector, for callers written before contract version `1.2.0`; new callers use the API.
+   *
    * @param abstractFiles - The notes, or folders of notes, to collect attachments for.
    */
   public collectAttachmentsInAbstractFiles(abstractFiles: TAbstractFile[]): void {
@@ -85,6 +97,29 @@ export class Plugin extends PluginBase {
 
   protected override createTranslationsMap(): TranslationsMap {
     return translationsMap;
+  }
+
+  /**
+   * Declares the API for the base to publish, once `onloadImpl` has built it.
+   *
+   * Published by the base rather than by hand: the `plugin-loaded` broadcast's `apiVersions` is derived from
+   * this method alone, so a hand `publishPluginApi` call would announce this plugin as publishing no API at
+   * all — while the registry still worked, which is what makes that mistake invisible.
+   *
+   * @returns The declaration, or none while the feature surface is down.
+   */
+  protected override getPluginApis(): PluginApiDeclaration[] {
+    if (!this.pluginApi) {
+      return [];
+    }
+
+    return [
+      {
+        api: this.pluginApi,
+        apiVersion: PLUGIN_API_VERSION,
+        contract: PLUGIN_API_CONTRACT
+      }
+    ];
   }
 
   protected override getPluginConflicts(): PluginConflict[] {
@@ -251,6 +286,14 @@ export class Plugin extends PluginBase {
     });
     this.attachmentCollector = attachmentCollector;
 
+    this.addChild(
+      new AutomaticAttachmentCollectorComponent({
+        app: this.app,
+        attachmentCollector,
+        pluginSettingsComponent
+      })
+    );
+
     // Unloads with the feature surface, which goes whenever the dependency goes away — and this method runs
     // Again when it comes back. Whatever this method leaves outside its own children is undone here.
     const featureSurfaceLifetimeComponent = this.addChild(new Component());
@@ -259,6 +302,21 @@ export class Plugin extends PluginBase {
     // Does nothing in between rather than driving a collector whose components have been torn down.
     featureSurfaceLifetimeComponent.register(() => {
       this.attachmentCollector = null;
+    });
+
+    /*
+     * The published API, built here so the base can hand it out in `getPluginApis` — and cleared with the
+     * surface for the same reason the collector is, since it drives the same components.
+     */
+    this.pluginApi = new PluginApiImpl({
+      app: this.app,
+      attachmentCollector,
+      attachmentPathManager,
+      handedOverSettingsComponent,
+      pluginSettingsComponent
+    });
+    featureSurfaceLifetimeComponent.register(() => {
+      this.pluginApi = null;
     });
 
     const unusedAttachmentsRemover = new UnusedAttachmentsRemover({
