@@ -560,7 +560,7 @@ function addDateTimeFormat(params: AddDateTimeFormatParams): string {
  * drawing is an attachment". The handler says the same thing since 2.1.0 with a second entry,
  * `property:excalidraw-plugin`, which also catches a drawing saved as a plain `.md`. Proposed as it was, the
  * historic list would show up as a row that REMOVES that entry from the handler's default, and a user approving it
- * would lose the new behaviour without being told. A list without `.excalidraw.md` is a user who opted out of
+ * would lose the new behavior without being told. A list without `.excalidraw.md` is a user who opted out of
  * treating drawings as attachments, and is proposed unchanged.
  *
  * @param extensions - The historic list, or `undefined` when the user never saved one.
