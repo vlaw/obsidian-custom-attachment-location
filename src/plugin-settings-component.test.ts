@@ -587,6 +587,13 @@ describe('PluginSettingsComponent', () => {
       expect(component.settings.generatedAttachmentFileName).toBe('file-{{date:{momentJsFormat:\'YYYYMMDD\'}}}');
     });
 
+    it('should fall back to the default generatedAttachmentFileName when a legacy record has none', async () => {
+      const component = await createComponent({
+        version: '9.0.0'
+      });
+      expect(component.settings.generatedAttachmentFileName).toBe(createSettings().generatedAttachmentFileName);
+    });
+
     /* eslint-disable no-template-curly-in-string -- The retired `${...}` plugin token syntax, not JS template literals. */
     it('should migrate every tokenized setting from the ${...} syntax to {{...}}', async () => {
       const component = await createComponent({

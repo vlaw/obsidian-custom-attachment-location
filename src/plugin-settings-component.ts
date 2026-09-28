@@ -245,7 +245,8 @@ ${commentOut(this.legacySettings.customTokensStr)}
       this.legacySettings.attachmentFolderPath = this.replaceLegacyTokens(this.legacySettings.attachmentFolderPath);
     }
 
-    this.legacySettings.generatedAttachmentFileName = this.replaceLegacyTokens(this.legacySettings.generatedAttachmentFileName);
+    // Never absent here: `convertDateTimeFormat` falls back to a pattern when the record has none.
+    this.legacySettings.generatedAttachmentFileName = this.replaceLegacyTokens(ensureNonNullable(this.legacySettings.generatedAttachmentFileName));
     // An absent key stays absent, so the default fills it rather than an '' that happens to match it today.
     if (this.legacySettings.markdownUrlFormat !== undefined) {
       this.legacySettings.markdownUrlFormat = this.replaceLegacyTokens(this.legacySettings.markdownUrlFormat);
@@ -386,16 +387,14 @@ ${commentOut(this.legacySettings.customTokensStr)}
     this.legacySettings.specialCharactersReplacement = this.legacySettings.whitespaceReplacement;
   }
 
-  private replaceLegacyTokens($string: string | undefined): string {
-    return $string === undefined
-      ? ''
-      : replaceAll({
-        $string,
-        replacer: ({ capturedGroupArguments: [token, momentJsFormat] }) => {
-          return `\${${ensureNonNullable(token)}:{momentJsFormat:'${ensureNonNullable(momentJsFormat)}'}}`;
-        },
-        searchValue: /\$\{(?<Token>date|noteFileCreationDate|noteFileModificationDate|originalAttachmentFileCreationDate|originalAttachmentFileModificationDate):(?<MomentJsFormat>\s*[^{]+?)\}/gi
-      });
+  private replaceLegacyTokens($string: string): string {
+    return replaceAll({
+      $string,
+      replacer: ({ capturedGroupArguments: [token, momentJsFormat] }) => {
+        return `\${${ensureNonNullable(token)}:{momentJsFormat:'${ensureNonNullable(momentJsFormat)}'}}`;
+      },
+      searchValue: /\$\{(?<Token>date|noteFileCreationDate|noteFileModificationDate|originalAttachmentFileCreationDate|originalAttachmentFileModificationDate):(?<MomentJsFormat>\s*[^{]+?)\}/gi
+    });
   }
 }
 
@@ -445,19 +444,6 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
     return !this.handedOverSettingsComponent.isTreatedAsAttachment(path);
   }
 
-  /**
-   * Loads the settings, and writes `data.json` the first time there is none.
-   *
-   * The base class returns early when nothing is stored, so a user who never saves a setting never gets a
-   * `data.json` and keeps running on whatever the defaults are TODAY. That is how 13.0.0's default change
-   * reached some existing users silently: nothing on disk told a fresh install apart from a user who had simply
-   * never opened the settings. Storing an empty record first lets the base class normalize it and save the
-   * full one, so from here on every user keeps the values they started with, and a later default change
-   * reaches new installs only.
-   *
-   * @param isInitialLoad - Whether the settings are being loaded for the first time.
-   * @returns A {@link Promise} that resolves when the settings are loaded.
-   */
   public replaceSpecialCharacters($string: string): string {
     if (!this.settings.specialCharacters) {
       return $string;
