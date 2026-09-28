@@ -18,7 +18,8 @@ import { findPluginSettingsComponent } from '../scripts/helpers/plugin-settings-
  * Excalidraw saves a pasted image itself: it asks `fileManager.getAvailablePathForAttachment` for
  * `Pasted Image <date>.png`, keeps only the folder this plugin resolves, and writes its own name into it with
  * `vault.createBinary`. So the paste is another plugin's attachment, and `renameAttachmentsCreatedByOtherPluginsMode`
- * is the switch that governs it. Two things used to stop that switch from ever reaching it, and each phase
+ * is the switch that governs it — under a list mode, only when Excalidraw is listed, which is what issue #92 asked
+ * to have waived and what the two phases below pin: not listed, then listed. Two things used to stop that switch from ever reaching it, and each phase
  * below exercises one:
  *
  *   - the resolver CLAIMED the path it handed Excalidraw as this plugin's own write, although the name in it was
@@ -95,6 +96,7 @@ interface ProbeResult {
 interface ScopedSettings {
   attachmentFolderPath: string;
   generatedAttachmentFileName: string;
+  otherPluginIdsForAttachmentRename: string[];
   renameAttachmentsCreatedByOtherPluginsMode: string;
 }
 
@@ -115,7 +117,8 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
           return typeof value === 'object' && value !== null
             && typeof (value as Record<string, unknown>)['renameAttachmentsCreatedByOtherPluginsMode'] === 'string'
             && typeof (value as Record<string, unknown>)['generatedAttachmentFileName'] === 'string'
-            && typeof (value as Record<string, unknown>)['attachmentFolderPath'] === 'string';
+            && typeof (value as Record<string, unknown>)['attachmentFolderPath'] === 'string'
+            && Array.isArray((value as Record<string, unknown>)['otherPluginIdsForAttachmentRename']);
         }
 
         const settingsComponent = findSettingsComponent(app.plugins.getPlugin('obsidian-custom-attachment-location'), isScopedSettings);
@@ -126,6 +129,7 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
         const originalSettings = {
           attachmentFolderPath: settingsComponent.settings.attachmentFolderPath,
           generatedAttachmentFileName: settingsComponent.settings.generatedAttachmentFileName,
+          otherPluginIdsForAttachmentRename: [...settingsComponent.settings.otherPluginIdsForAttachmentRename],
           renameAttachmentsCreatedByOtherPluginsMode: settingsComponent.settings.renameAttachmentsCreatedByOtherPluginsMode
         };
 
@@ -218,8 +222,14 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
           await settingsComponent.editAndSave((settings) => {
             settings.attachmentFolderPath = './assets/{{noteFileName}}';
             settings.generatedAttachmentFileName = `renamed-${stamp}`;
-            // The enum's values ARE the display strings; this code runs inside Obsidian and cannot import them.
-            settings.renameAttachmentsCreatedByOtherPluginsMode = 'None';
+            /*
+             * The enum's values ARE the display strings; this code runs inside Obsidian and cannot import them.
+             *
+             * The list names a plugin, just not Excalidraw: issue #92's vault, which expected the paste to be renamed
+             * anyway because the user, not Excalidraw, pasted it.
+             */
+            settings.renameAttachmentsCreatedByOtherPluginsMode = 'Only listed plugins';
+            settings.otherPluginIdsForAttachmentRename = ['advanced-rename-and-delete-handler'];
           });
 
           await app.vault.createFolder(folderPath);
@@ -229,11 +239,15 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
           const leaf = app.workspace.getLeavesOfType('excalidraw').find((candidate) => (candidate.view as ExcalidrawViewLike).file?.path === drawingPath);
           const view = leaf?.view as ExcalidrawViewLike;
 
-          // The control: with the switch off, the paste keeps Excalidraw's own name, so the rename below is the switch's doing.
+          // The control: with Excalidraw not listed, the paste keeps Excalidraw's own name, so the rename below is the list's doing.
           const controlPaste = await paste(ea, view, drawingPath, false);
 
           await settingsComponent.editAndSave((settings) => {
-            settings.renameAttachmentsCreatedByOtherPluginsMode = 'All';
+            /*
+             * Listing Excalidraw rather than switching to `All`: `All` renames a write nobody is attributed to as well,
+             * so only a list proves the paste is identified as Excalidraw's.
+             */
+            settings.otherPluginIdsForAttachmentRename = ['advanced-rename-and-delete-handler', excalidrawPluginId];
           });
           const renamedPaste = await paste(ea, view, drawingPath, true);
 
@@ -243,6 +257,7 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
           await settingsComponent.editAndSave((settings) => {
             settings.attachmentFolderPath = originalSettings.attachmentFolderPath;
             settings.generatedAttachmentFileName = originalSettings.generatedAttachmentFileName;
+            settings.otherPluginIdsForAttachmentRename = originalSettings.otherPluginIdsForAttachmentRename;
             settings.renameAttachmentsCreatedByOtherPluginsMode = originalSettings.renameAttachmentsCreatedByOtherPluginsMode;
           });
 
@@ -278,11 +293,11 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
     const drawingFolder = result.drawingPath.slice(0, result.drawingPath.lastIndexOf('/'));
     const drawingFileName = result.drawingPath.slice(result.drawingPath.lastIndexOf('/') + 1, -'.md'.length);
 
-    // With the switch off, the image stays exactly as Excalidraw named it.
+    // With Excalidraw not listed, the image stays exactly as Excalidraw named it.
     expect(result.controlPaste?.imagePath).toMatch(/\/Pasted Image [^/]+\.png$/);
 
     /*
-     * With it on, the image carries this plugin's generated name, in the folder the drawing's own template
+     * With it listed, the image carries this plugin's generated name, in the folder the drawing's own template
      * resolves to — the same folder Excalidraw was handed for it.
      */
     const renamedPaste = result.renamedPaste;
