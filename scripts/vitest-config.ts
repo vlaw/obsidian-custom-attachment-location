@@ -94,7 +94,7 @@ const GLOBAL_SETUP_FILE = './scripts/vitest-global-setup.ts';
  * transport's 30s DEFAULT rather than under this, and each one that waits says so beside its ceiling. A closure
  * written against this number would mean nothing on the Android project, which does not raise it, and would be
  * red under `obsidian-dev-utils/no-over-cap-wait-in-eval-in-obsidian`, which enforces the default cap. The one
- * exception is the `desktop-performance` project, whose closures are given their own explicit budget below.
+ * exception is the `desktop-performance` project, whose transport and cap obsidian-dev-utils raises itself.
  */
 const CDP_COMMAND_TIMEOUT_IN_MILLISECONDS = 240_000;
 
@@ -172,18 +172,6 @@ export const config = defineObsidianPluginVitestConfig({
     context.desktop.environmentOptions = {
       obsidianTransport: {
         commandTimeoutInMilliseconds: CDP_COMMAND_TIMEOUT_IN_MILLISECONDS,
-        type: 'obsidian-cdp'
-      }
-    };
-
-    context.desktopPerformance.environmentOptions = {
-      /*
-       * The bottleneck closure holds a single `Runtime.evaluate` open for the whole
-       * index-wait + settle + benchmark run, which far exceeds the transport's default
-       * 30s per-command timeout, so raise it to the performance test budget.
-       */
-      obsidianTransport: {
-        commandTimeoutInMilliseconds: context.performanceTimeoutInMilliseconds,
         type: 'obsidian-cdp'
       }
     };
