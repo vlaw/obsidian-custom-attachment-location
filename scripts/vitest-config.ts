@@ -161,6 +161,14 @@ export const config = defineObsidianPluginVitestConfig({
     ];
   },
   editContext(context: ObsidianPluginVitestConfigContext): void {
+    // `obsidian-dev-utils` 107.2.0 hardcodes `execArgv: ['--no-webstorage']` on the unit-tests project
+    // to suppress Node 25's experimental `globalThis.localStorage` so jsdom can install its own. On
+    // Node 24.20.0 the flag is unrecognized and the worker exits with code 9 (`bad option:`). Clearing
+    // `execArgv` here skips the flag; Node 24 has no built-in `localStorage` so jsdom still installs one.
+    // Drop this line once obsidian-dev-utils gates the flag on a Node-version probe, or this checkout
+    // pins Node 25+/26+ where the flag is accepted and the original behavior is needed.
+    context.unitTests.execArgv = [];
+
     // This plugin declares Advanced Rename and Delete Handler as a dependency and loads nothing without it, so
     // every vault these projects open has it seeded. The capture projects spread these same objects and so
     // inherit it; the demo-vault and performance projects bring setups of their own that seed it too.
