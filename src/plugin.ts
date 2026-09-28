@@ -61,6 +61,7 @@ import {
 } from './plugin-api.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
+import { createReleaseNotesComponent } from './release-notes-component.ts';
 import { TokenValidator } from './token-validator.ts';
 import { createTokenizedStringLanguageComponent } from './tokenized-string-language.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
@@ -243,11 +244,19 @@ export class Plugin extends PluginBase {
         handedOverSettingsComponent,
         imageSizeMap,
         markdownUrlMap,
-        pluginDirectory: this.manifest.dir ?? '',
         pluginId: this.manifest.id,
         pluginSettingsComponent,
-        pluginVersion: this.manifest.version,
         tokenValidator: validator
+      })
+    );
+
+    this.addChild(
+      createReleaseNotesComponent({
+        app: this.app,
+        pluginDirectory: this.manifest.dir ?? '',
+        pluginName: this.manifest.name,
+        pluginSettingsComponent,
+        pluginVersion: this.manifest.version
       })
     );
 

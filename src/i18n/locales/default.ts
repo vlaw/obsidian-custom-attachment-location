@@ -614,13 +614,12 @@ export const defaultTranslations = {
   },
   regularExpression: '/regular expression/',
   releaseNotes: {
-    title: 'Release notes',
     versionMismatch: {
       part1: 'Your settings file ',
       part2: 'has version',
       part3: 'which is newer than the current plugin version',
       part4: 'The plugin might not work as expected. Please update the plugin to the latest version or ensure that the settings are correct.',
-      title: 'Version mismatch'
+      title: '{{pluginName}} version mismatch'
     },
     versions: {
       '10.0.0': {

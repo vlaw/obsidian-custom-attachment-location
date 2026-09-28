@@ -68,6 +68,7 @@ import { AppSaveAttachmentPatchComponent } from './patches/app-save-attachment-p
 import { PLUGIN_API_CONTRACT } from './plugin-api.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
+import { createReleaseNotesComponent } from './release-notes-component.ts';
 import { TokenValidator } from './token-validator.ts';
 import { createTokenizedStringLanguageComponent } from './tokenized-string-language.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
@@ -226,6 +227,10 @@ vi.mock('./plugin-settings-tab.ts', () => ({
   PluginSettingsTab: vi.fn()
 }));
 
+vi.mock('./release-notes-component.ts', () => ({
+  createReleaseNotesComponent: vi.fn(() => new Component())
+}));
+
 vi.mock('./tokenized-string-language.ts', () => ({
   createTokenizedStringLanguageComponent: vi.fn(() => new Component())
 }));
@@ -246,10 +251,6 @@ vi.spyOn(CommandHandlerComponent.prototype, 'registerCommandHandlers').mockResol
 
 interface AppGlobal {
   app: AppOriginal;
-}
-
-interface CustomAttachmentLocationParamsProbe {
-  pluginDirectory: string;
 }
 
 interface MigrationParamsProbe {
@@ -279,6 +280,11 @@ interface PluginDependenciesProbe {
 
 interface PluginGateProbe {
   readonly pluginGateComponent: PluginGateComponent;
+}
+
+interface ReleaseNotesParamsProbe {
+  pluginDirectory: string;
+  pluginName: string;
 }
 
 interface SettingsTabParamsProbe {
@@ -709,12 +715,24 @@ describe('Plugin', () => {
     const plugin = new Plugin(app, manifestWithoutDirectory);
     await plugin.onload();
 
-    const call = vi.mocked(CustomAttachmentLocationComponent).mock.calls[0];
+    const call = vi.mocked(createReleaseNotesComponent).mock.calls[0];
     if (!call) {
-      throw new Error('CustomAttachmentLocationComponent was not constructed.');
+      throw new Error('The release notes component was not created.');
     }
-    const params = castTo<CustomAttachmentLocationParamsProbe>(call[0]);
+    const params = castTo<ReleaseNotesParamsProbe>(call[0]);
     expect(params.pluginDirectory).toBe('');
+  });
+
+  it('should name the plugin in the release notes', async () => {
+    const plugin = new Plugin(app, manifest);
+    await plugin.onload();
+
+    const call = vi.mocked(createReleaseNotesComponent).mock.calls[0];
+    if (!call) {
+      throw new Error('The release notes component was not created.');
+    }
+    const params = castTo<ReleaseNotesParamsProbe>(call[0]);
+    expect(params.pluginName).toBe(manifest.name);
   });
 });
 
