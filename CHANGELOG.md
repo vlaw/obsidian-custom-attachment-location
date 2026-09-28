@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 14.1.0-beta.0
+
+Sync upstream tag 14.0.0 onto develop so the vlaw fork carries the new `{{token:format}}` syntax, the obsidian-dev-utils 107 lifts, the release-notes popup rename, and every fix and test that landed in the upstream release. Conflicts in `AGENTS.md`, `CHANGELOG.md`, `package.json`, and `package-lock.json` were resolved with git rerere, re-applying the same hand-resolved shapes that survived the earlier merge attempt.
+
+- **deps**: bump `obsidian-dev-utils` to `^107.0.0` and the integration testing stack to `^17` so the token-syntax migration and the settings refactors land on the same surface upstream uses.
+- **tokens**: tokens are now written `{{noteFileName}}` / `{{date:YYYY-MM-DD}}`; the legacy `${...}` parser is removed. Saved patterns are rewritten automatically on first load.
+- **release-notes**: the popup uses `obsidian-dev-utils`'s `ReleaseNotesComponent` and is titled with the plugin name; it now waits for `data.json` before deciding which notes were already shown.
+- **external attachments**: an image pasted into an Excalidraw drawing keeps its rename (issue #65).
+- **delete-unused**: a drawing treated as an attachment is never swept as a note for unused attachments, and a drawing whose link text comes from `baseName` keeps that base name.
+- **settings**: drop the local `loadFromFile` override, the anchored-placeholder override, and the private-field `onSavingRecord` override that obsidian-dev-utils 107 now covers.
+- **styles**: drop the local multiple-dropdown rule now that obsidian-dev-utils' own rule matches (#86).
+- **tests**: edit settings through `editAndSave` in every desktop suite; cover the branches the obsidian-test-mocks 7 float left uncovered; pin the empty-folder cleanup race behind `Failed to parse path`; cover the sequence-number fallback and the empty declaration `getPluginApis` returns while the feature surface is down.
+- **deps**: add `ts-md5@^1.3.1` so the vlaw-only MD5 token imports cleanly. The dependency was introduced by commit `57d8cc6` but never declared, and the post-merge `lint` pass surfaced it.
+- **test**: clear `unitTests.execArgv` so workers on Node 24.20.0 do not inherit the `--no-webstorage` flag that obsidian-dev-utils 107 hard-codes for Node 25+. Node 24 rejects the flag at worker startup (`bad option: --no-webstorage`), and the flag is unnecessary there because Node 24 has no built-in `localStorage`. Drop the override once obsidian-dev-utils gates the flag on a Node-version probe or this checkout pins Node 25+/26+ where the flag is accepted.
+
 ## 14.0.0
 
 **Breaking: the token syntax moved from `${...}` to `{{...}}`.** Tokens are now written `{{noteFileName}}`, and a token with a format takes `{{token:format}}`, for example `{{date:YYYY-MM-DD}}`. The `${token}` and `${token:{...}}` forms no longer parse.
