@@ -37,7 +37,7 @@ import {
   SAMPLE_CUSTOM_TOKENS
 } from './plugin-settings.ts';
 import { Substitutions } from './substitutions.ts';
-import { TOKENIZED_STRING_LANGUAGE } from './tokenized-string-language-component.ts';
+import { TOKENIZED_STRING_LANGUAGE } from './tokenized-string-language.ts';
 
 const VISIBLE_SPACE_CHARACTER = '␣';
 const JPEG_QUALITY_PRECISION = 2;
@@ -65,7 +65,7 @@ interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstr
    *
    * @returns The plugin gate component.
    */
-  getPluginGateComponent(this: void): PluginGateComponent;
+  readonly getPluginGateComponent: (this: void) => PluginGateComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
@@ -90,24 +90,21 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
   protected override getSettingDefinitionItems(): SettingDefinitionItem[] {
     return [
       // The overlap banner has to travel as a ROW: Obsidian renders the declarative definitions and never
-      // Calls `display()` once `getSettingDefinitions()` is non-empty, so there is no container to write into
-      // Otherwise. The row body is emptied first, leaving the Setting element as a bare host for the banner.
-      // It cannot take a `visible` predicate yet: the library version this plugin compiles against renders the
-      // Banner but does not expose whether there is one to render, so the row is hidden after the fact when
-      // Nothing was written into it. Swap this for a predicate once the floor moves.
+      // calls `display()` once `getSettingDefinitions()` is non-empty, so there is no container to write into
+      // otherwise. The row body is emptied first, leaving the Setting element as a bare host for the banner.
+      // The row exists only while a warning conflict holds, since the library renders nothing otherwise and an
+      // empty row is still a divider and a block of padding.
       //
       // There is no row for Advanced Rename and Delete Handler: it is a declared dependency, so while it is
-      // Missing this tab is never registered at all and the library's own blocked tab explains what to install.
+      // missing this tab is never registered at all and the library's own blocked tab explains what to install.
       this.settingEx({
         name: '',
         render: (setting) => {
           setting.settingEl.empty();
           this.getPluginGateComponent().renderConflictWarningBanner(setting.settingEl);
-          if (!setting.settingEl.hasChildNodes()) {
-            setting.settingEl.hide();
-          }
         },
-        searchable: false
+        searchable: false,
+        visible: () => this.getPluginGateComponent().hasActiveWarningConflicts()
       }),
       this.settingGroupEx({
         heading: t(($) => $.pluginSettingsTab.groups.core),
@@ -510,7 +507,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         name: t(($) => $.pluginSettingsTab.customTokens.name),
         render: (setting) => {
           // Render-time setup: the builder must stay pure, because Obsidian calls it at plugin load to
-          // Index the settings for search. `hide()` clears the flag again.
+          // index the settings for search. `hide()` clears the flag again.
           this.pluginSettingsComponent2.shouldDebounceCustomTokensValidation = true;
           // eslint-disable-next-line unicorn/name-replacements -- `customTokensStr` is a persisted `data.json` settings key; renaming it would silently drop the user's custom tokens.
           const registerCustomTokensDebounced = debounce((customTokensStr: string) => {
@@ -544,18 +541,14 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
             button.setButtonText(t(($) => $.pluginSettingsTab.resetToSampleCustomTokens.title));
             button.setDestructive();
             button.onClick(convertAsyncToSync(async () => {
-              if (this.pluginSettingsComponent.settings.customTokensStr === SAMPLE_CUSTOM_TOKENS) {
-                return;
-              }
-
               if (
-                this.pluginSettingsComponent.settings.customTokensStr !== '' && !await confirm({
+                (this.pluginSettingsComponent.settings.customTokensStr === SAMPLE_CUSTOM_TOKENS) || (this.pluginSettingsComponent.settings.customTokensStr !== '' && !await confirm({
                   app: this.app,
                   cancelButtonText: t(($) => $.obsidianDevUtils.buttons.cancel),
                   message: t(($) => $.pluginSettingsTab.resetToSampleCustomTokens.message),
                   okButtonText: t(($) => $.obsidianDevUtils.buttons.ok),
                   title: t(($) => $.pluginSettingsTab.resetToSampleCustomTokens.title)
-                })
+                }))
               ) {
                 return;
               }

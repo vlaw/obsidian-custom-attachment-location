@@ -1,4 +1,5 @@
 import type {
+  MarkdownView as MarkdownViewOriginal,
   TAbstractFile,
   TFile
 } from 'obsidian';
@@ -34,19 +35,14 @@ import {
   PluginSettings,
   RenameAttachmentsCreatedByOtherPluginsMode
 } from './plugin-settings.ts';
-import { selfWriteRegistry } from './self-write-registry.ts';
+import {
+  SelfWriteClaim,
+  selfWriteRegistry
+} from './self-write-registry.ts';
 
 vi.mock('obsidian-dev-utils/error', () => ({
   printError: vi.fn<(error: unknown) => void>()
 }));
-
-interface ActiveTimeLike {
-  activeTime: number;
-}
-
-interface FileViewLike {
-  file: null | TFile;
-}
 
 interface GetAttachmentFolderFullPathForPathParams {
   readonly notePath?: string | undefined;
@@ -54,15 +50,15 @@ interface GetAttachmentFolderFullPathForPathParams {
 }
 
 interface SettingsOverrides {
-  isPathIgnored?(path: string): boolean;
+  isPathIgnored?: (path: string) => boolean;
   otherPluginIdsForAttachmentRename?: string[];
   renameAttachmentsCreatedByOtherPluginsMode?: RenameAttachmentsCreatedByOtherPluginsMode;
 }
 
 interface SetupOverrides {
   generatedAttachmentFileBaseName?: string;
-  isNoteEx?(pathOrFile: unknown): boolean;
-  onGetAttachmentFolderFullPathForPath?(params: GetAttachmentFolderFullPathForPathParams): void;
+  isNoteEx?: (pathOrFile: unknown) => boolean;
+  onGetAttachmentFolderFullPathForPath?: (params: GetAttachmentFolderFullPathForPathParams) => void;
   settings?: SettingsOverrides;
 }
 
@@ -380,7 +376,73 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
   });
 
   it('should do nothing when the active file is not a note', async () => {
-    await setUp({ isNoteEx: (): boolean => false });
+    const videoFile = await getApp().vault.createBinary('some-video.mp4', new ArrayBuffer(4));
+    await setUp();
+    vi.spyOn(getApp().workspace, 'getActiveFile').mockReturnValue(videoFile);
+
+    await createForeignAttachment();
+
+    expect(renameFileSpy).not.toHaveBeenCalled();
+  });
+
+  it('should file an attachment under a drawing the user treats as an attachment (issue #65)', async () => {
+    /*
+     * A drawing is listed in `treatAsAttachmentExtensions` by default, so `isNoteEx` says it is not a note. It
+     * still OWNS the images it shows — the same call `AttachmentPathManager` makes when it resolves the folder a
+     * drawing's paste lands in — and Excalidraw writes each one as an indexed `[[link]]` line, which
+     * `renameFile` rewrites like any other.
+     */
+    const drawingPath = 'notes/sketch.excalidraw.md';
+    let chosenNotePath: string | undefined;
+    await setUp({
+      isNoteEx: (pathOrFile: unknown): boolean => getPath(pathOrFile).endsWith('.md') && !getPath(pathOrFile).endsWith('.excalidraw.md'),
+      onGetAttachmentFolderFullPathForPath: (params): void => {
+        chosenNotePath = params.notePath;
+      }
+    });
+    await getApp().vault.create(drawingPath, '');
+    vi.spyOn(getApp().workspace, 'getActiveFile').mockReturnValue(getApp().vault.getFileByPath(drawingPath));
+
+    await createForeignAttachment();
+
+    expect(renameFileSpy).toHaveBeenCalledOnce();
+    expect(chosenNotePath).toBe(drawingPath);
+  });
+
+  it('should rename a file a plugin wrote under its own name into a path resolved for it (issue #65)', async () => {
+    /*
+     * Excalidraw asks `getAvailablePathForAttachment` for its `Pasted Image <date>.png` and writes exactly the path
+     * it gets back. The resolver kept the caller's name, so this plugin named nothing — the claim it left is
+     * no reason to skip the file once a plugin is known to have written it.
+     */
+    await setUp();
+    selfWriteRegistry.register(FOREIGN_ATTACHMENT_PATH, SelfWriteClaim.OutsideCaller);
+    foreignWriteRegistry.register(FOREIGN_ATTACHMENT_PATH, 'obsidian-excalidraw-plugin');
+
+    await createForeignAttachment();
+
+    expect(renameFileSpy).toHaveBeenCalledOnce();
+  });
+
+  it('should leave a file core Obsidian wrote into a path resolved for it alone', async () => {
+    // The audio recorder and the file imports ask the same way, with no plugin on the stack; they are not another plugin's attachments.
+    await setUp();
+    selfWriteRegistry.register(FOREIGN_ATTACHMENT_PATH, SelfWriteClaim.OutsideCaller);
+
+    await createForeignAttachment();
+
+    expect(renameFileSpy).not.toHaveBeenCalled();
+  });
+
+  it('should still leave a path resolved for a plugin alone when that plugin is not one to rename', async () => {
+    await setUp({
+      settings: {
+        otherPluginIdsForAttachmentRename: ['media-extended'],
+        renameAttachmentsCreatedByOtherPluginsMode: RenameAttachmentsCreatedByOtherPluginsMode.OnlyListedPlugins
+      }
+    });
+    selfWriteRegistry.register(FOREIGN_ATTACHMENT_PATH, SelfWriteClaim.OutsideCaller);
+    foreignWriteRegistry.register(FOREIGN_ATTACHMENT_PATH, 'obsidian-excalidraw-plugin');
 
     await createForeignAttachment();
 
@@ -397,14 +459,14 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
   });
 
   /**
-   * Opens a markdown leaf holding `content`, standing in for the note a foreign plugin has just
-   * inserted its embed into but whose editor has not saved yet.
+   * Opens `notePath` in a markdown leaf holding `content`, standing in for the note a foreign plugin has
+   * just inserted its embed into but whose editor has not saved yet.
    */
-  async function openEditorWith(content: string): Promise<Editor> {
+  async function openEditorWith(content: string, notePath = NOTE_PATH): Promise<Editor> {
     const leaf = app.workspace.getLeaf(true);
-    const view = MarkdownView.create2__(leaf);
-    await leaf.open(view.asOriginalType7__());
-    await leaf.setViewState({ type: ViewType.Markdown });
+    // A markdown view state with no `file` is the empty view, as in Obsidian, so the leaf has to open the note.
+    await leaf.setViewState({ state: { file: notePath }, type: ViewType.Markdown });
+    const view = MarkdownView.fromOriginalType7__(leaf.view as MarkdownViewOriginal);
     view.editor.setValue(content);
     return view.editor;
   }
@@ -414,14 +476,14 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
    * the ACTIVE file is not a note at all.
    */
   async function openNoteLeaf(notePath = NOTE_PATH, activeTime?: number): Promise<void> {
-    await openEditorWith('');
+    await openEditorWith('', notePath);
+    if (activeTime === undefined) {
+      return;
+    }
+
     const leaf = getApp().workspace.getLeavesOfType(ViewType.Markdown).at(-1);
-    // `obsidian-test-mocks` puts neither a file nor an `activeTime` on a leaf, so stand both up.
-    const view: unknown = leaf?.view;
-    (view as FileViewLike).file = getApp().vault.getFileByPath(notePath);
-    if (activeTime !== undefined) {
-      const leafValue: unknown = leaf;
-      (leafValue as ActiveTimeLike).activeTime = activeTime;
+    if (leaf) {
+      leaf.activeTime = activeTime;
     }
   }
 
@@ -592,6 +654,21 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
     } finally {
       vi.useRealTimers();
     }
+
+    expect(renameFileSpy).toHaveBeenCalledOnce();
+  });
+
+  it('should resolve a link in an editor with no file of its own against the note', async () => {
+    await setUp();
+    const leaf = app.workspace.getLeaf(true);
+    await leaf.setViewState({ state: { file: NOTE_PATH }, type: ViewType.Markdown });
+    const view = MarkdownView.fromOriginalType7__(leaf.view as MarkdownViewOriginal);
+    // The view stays a markdown view once its file is unloaded, so the note the templates are evaluated for is the only source path left.
+    await view.loadFile(null);
+    view.editor.setValue('![](../wherever/mx-img-abc.png)');
+
+    // Unlinked in the metadata cache, so only the editor can tell the handler the note refers to the file.
+    await createForeignAttachment(FOREIGN_ATTACHMENT_PATH, false);
 
     expect(renameFileSpy).toHaveBeenCalledOnce();
   });

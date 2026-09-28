@@ -62,7 +62,7 @@ import {
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { TokenValidator } from './token-validator.ts';
-import { TokenizedStringLanguageComponent } from './tokenized-string-language-component.ts';
+import { createTokenizedStringLanguageComponent } from './tokenized-string-language.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 export class Plugin extends PluginBase {
@@ -109,17 +109,15 @@ export class Plugin extends PluginBase {
    * @returns The declaration, or none while the feature surface is down.
    */
   protected override getPluginApis(): PluginApiDeclaration[] {
-    if (!this.pluginApi) {
-      return [];
-    }
-
-    return [
-      {
-        api: this.pluginApi,
-        apiVersion: PLUGIN_API_VERSION,
-        contract: PLUGIN_API_CONTRACT
-      }
-    ];
+    return this.pluginApi
+      ? [
+        {
+          api: this.pluginApi,
+          apiVersion: PLUGIN_API_VERSION,
+          contract: PLUGIN_API_CONTRACT
+        }
+      ]
+      : [];
   }
 
   protected override getPluginConflicts(): PluginConflict[] {
@@ -159,7 +157,7 @@ export class Plugin extends PluginBase {
     const validatorWrapper = ValueWrapper.unset<TokenValidator>();
 
     // Before the settings component, which reads back through it: `isNoteEx` consults the attachment-extension
-    // List that Advanced Rename and Delete Handler owns since 12.0.0.
+    // list that Advanced Rename and Delete Handler owns since 12.0.0.
     const handedOverSettingsComponent = this.addChild(
       new HandedOverSettingsComponent({
         app: this.app
@@ -182,8 +180,8 @@ export class Plugin extends PluginBase {
         apiVersionRange: ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE,
         app: this.app,
         // Names only what migrating needs, `migrateSettings`. The dependency gate already insists on a provider
-        // New enough for the read-back, so this cannot widen who is offered the migration; it only keeps the
-        // Migration from claiming to need what it does not use.
+        // new enough for the read-back, so this cannot widen who is offered the migration; it only keeps the
+        // migration from claiming to need what it does not use.
         contract: ADVANCED_RENAME_AND_DELETE_HANDLER_MIGRATION_API_CONTRACT,
         getProposedSettings: (): MigratableSettings | null => pluginSettingsComponent.settings.proposedRenameDeleteSettings,
         pluginSettingsComponent,
@@ -295,11 +293,11 @@ export class Plugin extends PluginBase {
     );
 
     // Unloads with the feature surface, which goes whenever the dependency goes away — and this method runs
-    // Again when it comes back. Whatever this method leaves outside its own children is undone here.
+    // again when it comes back. Whatever this method leaves outside its own children is undone here.
     const featureSurfaceLifetimeComponent = this.addChild(new Component());
 
     // The field is read by `collectAttachmentsInAbstractFiles`, so it is cleared with the surface: the method
-    // Does nothing in between rather than driving a collector whose components have been torn down.
+    // does nothing in between rather than driving a collector whose components have been torn down.
     featureSurfaceLifetimeComponent.register(() => {
       this.attachmentCollector = null;
     });
@@ -335,14 +333,12 @@ export class Plugin extends PluginBase {
       pluginSettingsComponent
     });
 
-    // TODO: Drop the disposal below once obsidian-dev-utils ties commands registered from `onloadImpl` to the
-    // Feature surface. Today they go through the base's universal command component, so they outlive the
-    // Surface: with the dependency gone they would stay in the palette, calling into torn-down components.
-    const commandHandlersDisposable = await this.commandHandlerComponent.registerCommandHandlers(() => [
+    await this.commandHandlerComponent.registerCommandHandlers(() => [
       new CollectAttachmentsInFileCommandHandler({
         attachmentCollector
       }),
       new DeleteUnusedAttachmentsInFileCommandHandler({
+        pluginSettingsComponent,
         unusedAttachmentsRemover
       }),
       new CollectAttachmentsInCurrentFolderCommandHandler({
@@ -383,9 +379,6 @@ export class Plugin extends PluginBase {
         pluginVersion: this.manifest.version
       })
     ]);
-    featureSurfaceLifetimeComponent.register(() => {
-      commandHandlersDisposable.dispose();
-    });
 
     this.addChild(
       new AppSaveAttachmentPatchComponent({
@@ -394,6 +387,6 @@ export class Plugin extends PluginBase {
       })
     );
 
-    this.addChild(new TokenizedStringLanguageComponent());
+    this.addChild(createTokenizedStringLanguageComponent());
   }
 }

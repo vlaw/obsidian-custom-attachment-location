@@ -39,12 +39,17 @@ import {
   it
 } from 'vitest';
 
+import {
+  ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
+  ADVANCED_RENAME_AND_DELETE_HANDLER_SEEDED_SETTINGS
+} from '../scripts/helpers/advanced-rename-and-delete-handler-seed.ts';
+
 /**
  * A file-explorer row, reduced to the collapse toggle.
  */
 interface CollapsibleFileItem {
   collapsed?: boolean;
-  setCollapsed?(this: void, isCollapsed: boolean): Promise<void>;
+  setCollapsed?: (this: void, isCollapsed: boolean) => Promise<void>;
 }
 
 /**
@@ -59,7 +64,23 @@ interface FileExplorerView {
  * declare. Setting the config alone changes nothing on screen.
  */
 interface InlineTitleApp {
-  updateInlineTitleDisplay(this: void): void;
+  updateInlineTitleDisplay: (this: void) => void;
+}
+
+/**
+ * The `moment` Obsidian exposes, reduced to its clock hook. Every `moment()`
+ * with no argument reads the time through `moment.now`, so replacing it moves
+ * the clock the `{{date}}` token sees and nothing else.
+ */
+interface MomentClock {
+  now: (this: void) => number;
+}
+
+/**
+ * `window`, reduced to the `moment` global Obsidian puts on it.
+ */
+interface MomentClockWindow {
+  moment: MomentClock;
 }
 
 const WIDTH_IN_PIXELS = 1200;
@@ -81,6 +102,22 @@ const RENAMED_NOTE_PATH = `${NOTE_FOLDER}/${RENAMED_NOTE_NAME}.md`;
 const PASTED_FILE_NAME = 'Pasted image 20260815093000';
 
 /**
+ * The moment the capture pretends it is, in the device's local time. The
+ * attachment names carry the day through `{{date:{momentJsFormat:'YYYYMMDD'}}}`,
+ * so a real clock would stamp every frame with the day it was shot, and two
+ * captures on different days would differ outside anything that changed. The
+ * day of the pasted files, a few hours after them: far enough that the pasted-
+ * image heuristic, which trusts a `Pasted image` name only within seconds of
+ * now, answers exactly as it does on a real clock.
+ */
+const CAPTURE_NOW_LOCAL_ISO = '2026-08-15T12:00:00';
+
+/**
+ * `CAPTURE_NOW_LOCAL_ISO` as the `{{date}}` token renders it.
+ */
+const CAPTURE_DAY = '20260815';
+
+/**
  * The pile shot 1 is about — Obsidian's naming, four days running.
  */
 const PILE_FILE_NAMES = [
@@ -96,16 +133,24 @@ beforeAll(async () => {
   const vault = getTemporaryVault();
 
   vault.populate({
-    [`.obsidian/plugins/${PLUGIN_ID}/data.json`]: JSON.stringify({
-      // The pattern the plugin's own defaults recommend, spelled out so the
-      // Frames match what the settings would show.
-      // eslint-disable-next-line no-template-curly-in-string -- A plugin token, not a template literal of this file.
-      attachmentFolderPath: './assets/${noteFileName}',
-      attachmentRenameMode: 'All',
-      // eslint-disable-next-line no-template-curly-in-string -- Plugin tokens, not a template literal of this file.
-      generatedAttachmentFileName: '${noteFileName}-${date:{momentJsFormat:\'YYYYMMDD\'}}',
+    // Renames are the handler's to carry out, and its seed leaves them off. This
+    // vault belongs to the capture alone, so its record is written outright, with
+    // the note's attachment folder and files following a rename.
+    [`.obsidian/plugins/${ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID}/data.json`]: JSON.stringify({
+      ...ADVANCED_RENAME_AND_DELETE_HANDLER_SEEDED_SETTINGS,
       shouldHandleRenames: true,
+      shouldRenameAttachmentFiles: true,
       shouldRenameAttachmentFolder: true
+    }),
+    [`.obsidian/plugins/${PLUGIN_ID}/data.json`]: JSON.stringify({
+      // The pattern the plugin recommends, spelled out so the frames match what
+      // the settings would show. This file replaces the seeded one, so it also
+      // switches off following Obsidian's attachment location, the default
+      // since 13.0.0, which would leave the pattern unread.
+      attachmentFolderPath: './assets/{{noteFileName}}',
+      attachmentRenameMode: 'All',
+      generatedAttachmentFileName: '{{noteFileName}}-{{date:{momentJsFormat:\'YYYYMMDD\'}}}',
+      shouldFollowObsidianAttachmentLocation: false
     }),
     [SECOND_NOTE_PATH]: '# Retrospective\n\nWhat went well, what did not.\n',
     [SUBJECT_NOTE_PATH]: `# ${SUBJECT_NOTE_NAME}\n\nNotes from the kickoff.\n`
@@ -113,11 +158,17 @@ beforeAll(async () => {
   await vault.syncToDevice();
 
   await evalInObsidian({
-    async callback({ app, lib: { waitUntil }, subjectNotePath }) {
+    async callback({ app, captureNowLocalIso, lib: { waitUntil }, subjectNotePath }) {
       const SETTLE_TIMEOUT_IN_MILLISECONDS = 20_000;
       const SETTLE_DELAY_IN_MILLISECONDS = 1000;
 
       app.changeTheme('obsidian');
+
+      // Pinned for the capture's whole life: the vault and the app are the
+      // capture's alone, so nothing else reads this clock.
+      const capturedNowInMilliseconds = new Date(captureNowLocalIso).getTime();
+      const momentClockWindow: unknown = window;
+      (momentClockWindow as MomentClockWindow).moment.now = (): number => capturedNowInMilliseconds;
 
       await waitUntil({
         message: 'the staged notes to appear in the vault',
@@ -126,7 +177,7 @@ beforeAll(async () => {
       });
 
       // The file explorer IS the subject here — where a file landed is the whole
-      // Story — so it stays open in every frame.
+      // story — so it stays open in every frame.
       app.workspace.leftSplit.expand();
       const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
       if (fileExplorerLeaf) {
@@ -139,7 +190,7 @@ beforeAll(async () => {
 
       await sleep(SETTLE_DELAY_IN_MILLISECONDS);
     },
-    input: { subjectNotePath: SUBJECT_NOTE_PATH },
+    input: { captureNowLocalIso: CAPTURE_NOW_LOCAL_ISO, subjectNotePath: SUBJECT_NOTE_PATH },
     vaultPath: vaultPath()
   });
 });
@@ -149,9 +200,9 @@ describe('desktop store screenshots', () => {
     await setPluginEnabled(false);
 
     // Four pastes, not one: the complaint is a PILE of identically-shaped names,
-    // And a single file under the caption "one heap" would be the caption doing
-    // The work the picture is supposed to do. Two notes, so the pile visibly
-    // Belongs to no note in particular.
+    // and a single file under the caption "one heap" would be the caption doing
+    // the work the picture is supposed to do. Two notes, so the pile visibly
+    // belongs to no note in particular.
     const savedPaths: string[] = [];
     for (const [index, fileName] of PILE_FILE_NAMES.entries()) {
       const notePath = index % 2 === 0 ? SUBJECT_NOTE_PATH : SECOND_NOTE_PATH;
@@ -159,10 +210,10 @@ describe('desktop store screenshots', () => {
     }
 
     // Obsidian's own default is the vault root, and the name is the timestamp
-    // One. Both halves of the complaint, asserted rather than assumed.
+    // one. Both halves of the complaint, asserted rather than assumed.
     expect(savedPaths).toStrictEqual(PILE_FILE_NAMES.map((fileName) => `${fileName}.png`));
     await openNote(SUBJECT_NOTE_PATH);
-    await shoot(1, 'Every pasted screenshot in one heap, named after the clock');
+    await shoot(1, 'Every pasted screenshot in one heap, named by the clock');
   });
 
   it('2 - a folder per note', async () => {
@@ -175,7 +226,7 @@ describe('desktop store screenshots', () => {
 
   it('3 - named after the note that owns it', async () => {
     const savedPath = await pasteAttachment(SECOND_NOTE_PATH, PASTED_FILE_NAME);
-    expect(savedPath).toContain('Retrospective-');
+    expect(savedPath).toContain(`Retrospective-${CAPTURE_DAY}`);
     expect(savedPath).not.toContain(PASTED_FILE_NAME);
     await openNote(SECOND_NOTE_PATH);
     await shoot(3, 'And named after the note it belongs to, not the clock');
@@ -192,7 +243,7 @@ describe('desktop store screenshots', () => {
   it('5 - the link inside the note still resolves', async () => {
     const embedCount = await openNote(RENAMED_NOTE_PATH, 'preview');
     expect(embedCount).toBeGreaterThan(0);
-    await shoot(5, 'The embed still resolves — nothing is left pointing nowhere');
+    await shoot(5, 'The embed still resolves — no broken links');
   });
 });
 
@@ -207,8 +258,8 @@ describe('desktop store screenshots', () => {
  */
 async function buildScreenshotAttachment(): Promise<Uint8Array> {
   // Drawn as shapes rather than text: sharp renders SVG text through whatever
-  // Fonts the host happens to have, so a captioned placeholder would look
-  // Different on another machine — or lose its caption entirely.
+  // fonts the host happens to have, so a captioned placeholder would look
+  // different on another machine — or lose its caption entirely.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270">
     <rect width="480" height="270" rx="10" fill="#f4f5f8"/>
     <rect width="480" height="34" rx="10" fill="#5a76b4"/>
@@ -242,7 +293,7 @@ async function openNote(notePath: string, mode = 'source'): Promise<number> {
       const RESIZE_SETTLE_DELAY_IN_MILLISECONDS = 2000;
 
       // Let the previous shot's capture settle: the device-metrics override it
-      // Sets and clears disturbs anything driven too soon afterwards.
+      // sets and clears disturbs anything driven too soon afterwards.
       await sleep(RESIZE_SETTLE_DELAY_IN_MILLISECONDS);
 
       const file = app.vault.getFileByPath(path);
@@ -265,8 +316,8 @@ async function openNote(notePath: string, mode = 'source'): Promise<number> {
 
       // A folder the tree has not expanded is a folder the reader cannot see, and
       // WHERE the attachment landed is the entire story here. Expanded on every
-      // Shot rather than once, because each paste creates a new folder that
-      // Arrives collapsed.
+      // shot rather than once, because each paste creates a new folder that
+      // arrives collapsed.
       const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
       if (fileExplorerLeaf) {
         const view: unknown = fileExplorerLeaf.view;
@@ -280,7 +331,7 @@ async function openNote(notePath: string, mode = 'source'): Promise<number> {
       await sleep(SETTLE_DELAY_IN_MILLISECONDS);
 
       // Only the on-screen copies count — Obsidian leaves the note's previous
-      // Render in the document, detached and zero-sized.
+      // render in the document, detached and zero-sized.
       return [...document.querySelectorAll('.internal-embed img, .image-embed img')]
         .filter((element) => element.getBoundingClientRect().width > 0).length;
     },
@@ -319,8 +370,8 @@ async function pasteAttachment(notePath: string, fileName: string): Promise<stri
       const savedFile = await app.saveAttachment(baseName, 'png', binary.buffer);
 
       // `generateMarkdownLink` returns a plain link even for an image, so the `!`
-      // Is added here — without it the note shows link TEXT and shot 5 has no
-      // Embed to prove still resolves.
+      // is added here — without it the note shows link TEXT and shot 5 has no
+      // embed to prove still resolves.
       const link = app.fileManager.generateMarkdownLink(savedFile, file.path);
       await app.vault.process(file, (content) => `${content}\n!${link}\n`);
 

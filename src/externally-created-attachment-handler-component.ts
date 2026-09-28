@@ -16,6 +16,7 @@ import {
   setTimeoutAsync
 } from 'obsidian-dev-utils/async';
 import { printError } from 'obsidian-dev-utils/error';
+import { isNote } from 'obsidian-dev-utils/obsidian/file-system';
 import {
   splitSubpath,
   updateLink
@@ -39,7 +40,10 @@ import type { TokenValidator } from './token-validator.ts';
 
 import { foreignWriteRegistry } from './foreign-write-registry.ts';
 import { RenameAttachmentsCreatedByOtherPluginsMode } from './plugin-settings.ts';
-import { selfWriteRegistry } from './self-write-registry.ts';
+import {
+  SelfWriteClaim,
+  selfWriteRegistry
+} from './self-write-registry.ts';
 import { Substitutions } from './substitutions.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
@@ -110,10 +114,16 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
    *
    * The attachment still belongs to a note (Media Extended inserts its embed into the media note), so
    * fall back to the most recently active markdown leaf, which is that note.
+   *
+   * Plain `isNote`, not `isNoteEx`, on purpose — the same call `AttachmentPathManager` makes when it resolves the
+   * folder a drawing's paste lands in. A drawing the user treats as an attachment still OWNS the images it
+   * shows (issue #65), and Excalidraw records each one as an ordinary `[[link]]` line under `## Embedded Files`,
+   * outside its `compressed-json` block, so the metadata cache indexes it and `renameFile` rewrites it. The open
+   * drawing follows too: its in-memory record of the image holds the `TFile` and serializes the link from it.
    */
   private findNoteFile(): null | TFile {
     const activeFile = this.app.workspace.getActiveFile();
-    if (activeFile && this.pluginSettingsComponent.isNoteEx(activeFile)) {
+    if (activeFile && isNote(activeFile)) {
       return activeFile;
     }
 
@@ -124,52 +134,38 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
       }
     }
 
-    const noteFile = (mostRecentLeaf?.view as MarkdownView | undefined)?.file ?? null;
-    if (!noteFile || !this.pluginSettingsComponent.isNoteEx(noteFile)) {
-      return null;
-    }
-
-    return noteFile;
+    return (mostRecentLeaf?.view as MarkdownView | undefined)?.file ?? null;
   }
 
   private async handleCreate(abstractFile: TAbstractFile): Promise<void> {
     const { settings } = this.pluginSettingsComponent;
-    if (settings.renameAttachmentsCreatedByOtherPluginsMode === RenameAttachmentsCreatedByOtherPluginsMode.None) {
-      return;
-    }
-
-    if (!(abstractFile instanceof TFile)) {
+    if (settings.renameAttachmentsCreatedByOtherPluginsMode === RenameAttachmentsCreatedByOtherPluginsMode.None || !(abstractFile instanceof TFile)) {
       return;
     }
 
     const attachmentFile = abstractFile;
 
     /*
-     * The plugin's own writes claim their path before writing it. Consuming the claim here is what
-     * stops a `${prompt}` template prompting a second time for every attachment the plugin saves.
+     * The plugin's own writes claim their path before writing it. Consuming the claim here is what stops a
+     * `{{prompt}}` template prompting a second time for every attachment the plugin saves.
      */
-    if (selfWriteRegistry.consume(attachmentFile.path)) {
-      return;
-    }
+    const selfWriteClaim = selfWriteRegistry.consume(attachmentFile.path);
 
-    if (this.pluginSettingsComponent.isNoteEx(attachmentFile)) {
-      return;
-    }
-
-    /*
-     * Only files created just now. A vault opening, a sync catching up or a folder import all replay
-     * `create` for files that already existed, and none of those are an attachment the user is adding
-     * to the note in front of them.
-     *
-     * A fixed window rather than the `timeoutInSeconds` setting: that one means "wait indefinitely"
-     * at 0, which here would silently disable the guard and let a whole synced folder be renamed.
-     * The value matches the pasted-image freshness threshold in `AttachmentSaver`.
-     */
-    if (Date.now() - attachmentFile.stat.ctime > FRESHLY_CREATED_THRESHOLD_IN_MILLISECONDS) {
-      return;
-    }
-
-    if (this.handedOverSettingsComponent.isPathIgnored(attachmentFile.path)) {
+    if (
+      selfWriteClaim === SelfWriteClaim.Plugin
+      || this.pluginSettingsComponent.isNoteEx(attachmentFile)
+      /*
+       * Only files created just now. A vault opening, a sync catching up or a folder import all replay
+       * `create` for files that already existed, and none of those are an attachment the user is adding
+       * to the note in front of them.
+       *
+       * A fixed window rather than the `timeoutInSeconds` setting: that one means "wait indefinitely"
+       * at 0, which here would silently disable the guard and let a whole synced folder be renamed.
+       * The value matches the pasted-image freshness threshold in `AttachmentSaver`.
+       */
+      || Date.now() - attachmentFile.stat.ctime > FRESHLY_CREATED_THRESHOLD_IN_MILLISECONDS
+      || this.handedOverSettingsComponent.isPathIgnored(attachmentFile.path)
+    ) {
       return;
     }
 
@@ -183,21 +179,19 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
      * listed plugins", which is what makes both list modes read the way their names promise.
      */
     const creatingPluginId = foreignWriteRegistry.consume(attachmentFile.path);
-    if (!settings.shouldRenameAttachmentCreatedByPlugin(creatingPluginId)) {
+    /*
+     * A path this plugin resolved for an outside caller kept that caller's file name. It is this plugin's own
+     * only when core Obsidian wrote it — the audio recorder and the file imports ask that way. A plugin that
+     * asked for a folder and wrote its own name into it (Excalidraw's `Pasted Image <date>.png`, issue #65) is
+     * exactly what this handler is for.
+     */
+    if ((selfWriteClaim === SelfWriteClaim.OutsideCaller && creatingPluginId === null) || !settings.shouldRenameAttachmentCreatedByPlugin(creatingPluginId)) {
       return;
     }
 
     const noteFile = this.findNoteFile();
     // The templates are relative to a note. Without one there is nothing to resolve them against.
-    if (!noteFile) {
-      return;
-    }
-
-    if (this.handedOverSettingsComponent.isPathIgnored(noteFile.path)) {
-      return;
-    }
-
-    if (!await this.waitForNoteReference(attachmentFile, noteFile)) {
+    if (!noteFile || this.handedOverSettingsComponent.isPathIgnored(noteFile.path) || !await this.waitForNoteReference(attachmentFile, noteFile)) {
       return;
     }
 
@@ -402,11 +396,9 @@ function isLinkTo(url: string, targetPath: string, notePath: string): boolean {
     return false;
   }
 
-  if (linkPath.startsWith('/')) {
-    return linkPath.slice(1) === targetPath;
-  }
-
-  return join(dirname(notePath), linkPath) === targetPath
-    || linkPath === targetPath
-    || linkPath === basename(targetPath);
+  return linkPath.startsWith('/')
+    ? linkPath.slice(1) === targetPath
+    : join(dirname(notePath), linkPath) === targetPath
+      || linkPath === targetPath
+      || linkPath === basename(targetPath);
 }

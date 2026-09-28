@@ -367,11 +367,7 @@ export class AttachmentCollector {
       params.abortSignal.throwIfAborted();
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Could be changed in await call.
-      if (params.context.isAborted) {
-        return;
-      }
-
-      if (!cache) {
+      if (params.context.isAborted || !cache) {
         return;
       }
 
@@ -570,8 +566,8 @@ export class AttachmentCollector {
                 }
                 if (result.unitFolderPath) {
                   // Copying the lone file out of a unit folder produces exactly the broken attachment
-                  // The unit designation exists to prevent, and copying the whole tree behind the
-                  // Other notes' backs is worse. Leave it where every note can still reach it.
+                  // the unit designation exists to prevent, and copying the whole tree behind the
+                  // other notes' backs is worse. Leave it where every note can still reach it.
                   console.warn(
                     `Skipping collecting attachment ${result.oldAttachmentPath} as it belongs to the attachment unit folder ${result.unitFolderPath}`
                       + ` and is referenced by multiple notes.\n${backlinksString}`
@@ -603,17 +599,16 @@ export class AttachmentCollector {
                       link: link2,
                       sourcePathOrFile: params.note
                     });
-                    if (linkFile?.path !== result.oldAttachmentPath) {
-                      return;
-                    }
-                    return updateLink({
-                      app,
-                      link: link2,
-                      newSourcePathOrFile: params.note,
-                      newTargetPathOrFile: ensureNonNullable(result.newAttachmentPath),
-                      oldSourcePathOrFile: params.note,
-                      oldTargetPathOrFile: result.oldAttachmentPath
-                    });
+                    return linkFile?.path === result.oldAttachmentPath
+                      ? updateLink({
+                        app,
+                        link: link2,
+                        newSourcePathOrFile: params.note,
+                        newTargetPathOrFile: ensureNonNullable(result.newAttachmentPath),
+                        oldSourcePathOrFile: params.note,
+                        oldTargetPathOrFile: result.oldAttachmentPath
+                      })
+                      : undefined;
                   },
                   pathOrFile: params.note,
                   pluginNoticeComponent,
@@ -881,11 +876,7 @@ export class AttachmentCollector {
    * @returns `true` when the configured multiple-notes mode should run.
    */
   private needsMultipleNotesHandling(attachmentPath: string, relevantBacklinkCount: number): boolean {
-    if (this.pluginSettingsComponent.settings.isExtensionExcludedFromMultipleNotesCheck(attachmentPath)) {
-      return false;
-    }
-
-    return relevantBacklinkCount > 1;
+    return !this.pluginSettingsComponent.settings.isExtensionExcludedFromMultipleNotesCheck(attachmentPath) && relevantBacklinkCount > 1;
   }
 
   private async prepareAttachmentToMove(params: AttachmentCollectorPrepareAttachmentToMoveParams): Promise<AttachmentMoveResult | null> {
@@ -896,23 +887,15 @@ export class AttachmentCollector {
       sourcePathOrFile: params.oldNotePath
     });
 
-    if (!oldAttachmentFile) {
-      return null;
-    }
-
-    if (this.pluginSettingsComponent.isNoteEx(oldAttachmentFile)) {
-      return null;
-    }
-
-    if (params.oldAttachmentPaths.has(oldAttachmentFile.path)) {
+    if (!oldAttachmentFile || this.pluginSettingsComponent.isNoteEx(oldAttachmentFile) || params.oldAttachmentPaths.has(oldAttachmentFile.path)) {
       return null;
     }
 
     params.oldAttachmentPaths.add(oldAttachmentFile.path);
 
     // An earlier link in this same note may have already carried this attachment away inside its unit
-    // Folder. The link snapshot still names the old path, so without this the file reads as
-    // Unresolvable and would be reported as a broken link rather than as work already done.
+    // folder. The link snapshot still names the old path, so without this the file reads as
+    // unresolvable and would be reported as a broken link rather than as work already done.
     for (const movedUnitFolderPath of params.movedUnitFolderPaths.keys()) {
       if (oldAttachmentFile.path.startsWith(`${movedUnitFolderPath}/`)) {
         return null;
@@ -1012,11 +995,7 @@ export class AttachmentCollector {
    * @param params - The parameters.
    */
   private reportNothingCollected(params: AttachmentCollectorReportNothingCollectedParams): void {
-    if (!params.context.isSingleNoteRun) {
-      return;
-    }
-
-    if (params.alreadyInPlaceAttachmentPaths.size === 0 || params.alreadyInPlaceAttachmentPaths.size !== params.examinedAttachmentPaths.size) {
+    if (!params.context.isSingleNoteRun || params.alreadyInPlaceAttachmentPaths.size === 0 || params.alreadyInPlaceAttachmentPaths.size !== params.examinedAttachmentPaths.size) {
       return;
     }
 
@@ -1054,16 +1033,18 @@ export class AttachmentCollector {
       }
     }
 
-    if (changes.length > 0) {
-      await applyFileChanges({
-        app: this.app,
-        changesProvider: changes,
-        pathOrFile: params.note,
-        pluginNoticeComponent: this.pluginNoticeComponent,
-        resourceLockComponent: this.resourceLockComponent
-      });
-      params.abortSignal.throwIfAborted();
+    if (changes.length === 0) {
+      return;
     }
+
+    await applyFileChanges({
+      app: this.app,
+      changesProvider: changes,
+      pathOrFile: params.note,
+      pluginNoticeComponent: this.pluginNoticeComponent,
+      resourceLockComponent: this.resourceLockComponent
+    });
+    params.abortSignal.throwIfAborted();
   }
 
   /**

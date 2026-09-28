@@ -31,6 +31,7 @@ import {
   PluginSettings,
   RenameAttachmentsCreatedByOtherPluginsMode
 } from './plugin-settings.ts';
+import { migrateLegacyTokenSyntax } from './token-parser.ts';
 import {
   TokenValidationMode,
   TokenValidator
@@ -38,6 +39,18 @@ import {
 import { CustomToken } from './tokens/custom-token.ts';
 
 const CUSTOM_TOKENS_VALIDATOR_DEBOUNCE_IN_MILLISECONDS = 2000;
+const EXCALIDRAW_EXTENSION = '.excalidraw.md';
+const EXCALIDRAW_PROPERTY_ENTRY = 'property:excalidraw-plugin';
+
+// Every setting evaluated as a template, so every one the `{{...}}` syntax migration rewrites.
+const TOKENIZED_SETTINGS_KEYS = [
+  'attachmentFolderPath',
+  'collectedAttachmentFileName',
+  'collectedAttachmentFolderPath',
+  'generatedAttachmentFileName',
+  'markdownUrlFormat',
+  'renamedAttachmentFileName'
+] as const satisfies readonly (keyof PluginSettings)[];
 
 interface AddDateTimeFormatParams {
   readonly $string: string;
@@ -150,9 +163,11 @@ class LegacySettingsConverter {
     this.convertMarkdownUrlFormat();
     this.convertSpecialCharacters();
     this.convertLegacyTokens();
+    // After every converter above, since several of them still write the `${...}` syntax.
+    this.convertTokenSyntax();
 
     // LAST, and it must stay last: it reads the rename/delete keys the converters above normalize, so
-    // Running it earlier would gather the raw legacy names instead of the values they convert into.
+    // running it earlier would gather the raw legacy names instead of the values they convert into.
     this.convertRenameDeleteSettingsToProposal();
   }
 
@@ -197,7 +212,7 @@ ${commentOut(this.legacySettings.customTokensStr)}
   private convertDateTimeFormat(): void {
     const dateTimeFormat = this.legacySettings.dateTimeFormat ?? 'YYYYMMDDHHmmssSSS';
     // An absent key stays absent, so the default fills it. Converting it to '' used to put the attachments of
-    // Any record written without this key, such as a hand-seeded `data.json`, at the vault root.
+    // any record written without this key, such as a hand-seeded `data.json`, at the vault root.
     if (this.legacySettings.attachmentFolderPath !== undefined) {
       this.legacySettings.attachmentFolderPath = addDateTimeFormat({ $string: this.legacySettings.attachmentFolderPath, dateTimeFormat });
     }
@@ -230,8 +245,12 @@ ${commentOut(this.legacySettings.customTokensStr)}
       this.legacySettings.attachmentFolderPath = this.replaceLegacyTokens(this.legacySettings.attachmentFolderPath);
     }
 
-    this.legacySettings.generatedAttachmentFileName = this.replaceLegacyTokens(this.legacySettings.generatedAttachmentFileName);
-    this.legacySettings.markdownUrlFormat = this.replaceLegacyTokens(this.legacySettings.markdownUrlFormat);
+    // Never absent here: `convertDateTimeFormat` falls back to a pattern when the record has none.
+    this.legacySettings.generatedAttachmentFileName = this.replaceLegacyTokens(ensureNonNullable(this.legacySettings.generatedAttachmentFileName));
+    // An absent key stays absent, so the default fills it rather than an '' that happens to match it today.
+    if (this.legacySettings.markdownUrlFormat !== undefined) {
+      this.legacySettings.markdownUrlFormat = this.replaceLegacyTokens(this.legacySettings.markdownUrlFormat);
+    }
   }
 
   private convertMarkdownUrlFormat(): void {
@@ -297,7 +316,7 @@ ${commentOut(this.legacySettings.customTokensStr)}
     copyIfPresent('shouldRenameAttachmentFiles', legacySettings.shouldRenameAttachmentFiles);
     copyIfPresent('shouldRenameAttachmentFolder', legacySettings.shouldRenameAttachmentFolder);
     copyIfPresent('shouldRescueSharedAttachments', legacySettings.shouldRescueSharedAttachments);
-    copyIfPresent('treatAsAttachmentExtensions', legacySettings.treatAsAttachmentExtensions);
+    copyIfPresent('treatAsAttachmentExtensions', addExcalidrawPropertyEntry(legacySettings.treatAsAttachmentExtensions));
 
     if (Object.keys(proposedSettings).length === 0) {
       return;
@@ -336,6 +355,23 @@ ${commentOut(this.legacySettings.customTokensStr)}
     }
   }
 
+  /**
+   * Carries the six tokenized settings from the retired `${...}` syntax onto `{{...}}` (14.0.0).
+   *
+   * Not version-gated, deliberately: `${...}` no longer parses, so a legacy token left in any of these keys is
+   * broken whatever version wrote it, and {@link migrateLegacyTokenSyntax} leaves a string holding none untouched.
+   * `customTokensStr` is user-authored JavaScript and is NOT migrated; a template it still fills in the old syntax
+   * fails with a `LegacyTokenSyntaxError` naming the replacement.
+   */
+  private convertTokenSyntax(): void {
+    for (const key of TOKENIZED_SETTINGS_KEYS) {
+      const value = this.legacySettings[key];
+      if (typeof value === 'string') {
+        this.legacySettings[key] = migrateLegacyTokenSyntax(value);
+      }
+    }
+  }
+
   private convertWarningVersion(): void {
     if (this.legacySettings.warningVersion !== undefined) {
       this.legacySettings.version = this.legacySettings.warningVersion;
@@ -351,11 +387,7 @@ ${commentOut(this.legacySettings.customTokensStr)}
     this.legacySettings.specialCharactersReplacement = this.legacySettings.whitespaceReplacement;
   }
 
-  private replaceLegacyTokens($string: string | undefined): string {
-    if ($string === undefined) {
-      return '';
-    }
-
+  private replaceLegacyTokens($string: string): string {
     return replaceAll({
       $string,
       replacer: ({ capturedGroupArguments: [token, momentJsFormat] }) => {
@@ -410,28 +442,6 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
 
     const path = getPath(this.app, pathOrFile);
     return !this.handedOverSettingsComponent.isTreatedAsAttachment(path);
-  }
-
-  /**
-   * Loads the settings, and writes `data.json` the first time there is none.
-   *
-   * The base class returns early when nothing is stored, so a user who never saves a setting never gets a
-   * `data.json` and keeps running on whatever the defaults are TODAY. That is how 13.0.0's default change
-   * reached some existing users silently: nothing on disk told a fresh install apart from a user who had simply
-   * never opened the settings. Storing an empty record first lets the base class normalize it and save the
-   * full one, so from here on every user keeps the values they started with, and a later default change
-   * reaches new installs only.
-   *
-   * @param isInitialLoad - Whether the settings are being loaded for the first time.
-   * @returns A {@link Promise} that resolves when the settings are loaded.
-   */
-  public override async loadFromFile(isInitialLoad: boolean): Promise<void> {
-    const data: unknown = await this.dataHandler.loadData();
-    if (data === undefined || data === null) {
-      await this.dataHandler.saveData({});
-    }
-
-    await super.loadFromFile(isInitialLoad);
   }
 
   public replaceSpecialCharacters($string: string): string {
@@ -526,6 +536,25 @@ function addDateTimeFormat(params: AddDateTimeFormatParams): string {
   const { $string, dateTimeFormat } = params;
   // eslint-disable-next-line no-template-curly-in-string -- Valid token.
   return $string.replaceAll('${date}', () => `\${date:{momentJsFormat:'${dateTimeFormat}'}}`);
+}
+
+/**
+ * Carries a historic `treatAsAttachmentExtensions` list over to Advanced Rename and Delete Handler without losing
+ * what that plugin now adds to it (#90).
+ *
+ * This plugin's list could only hold extensions, so a user who kept `.excalidraw.md` in it meant "an Excalidraw
+ * drawing is an attachment". The handler says the same thing since 2.1.0 with a second entry,
+ * `property:excalidraw-plugin`, which also catches a drawing saved as a plain `.md`. Proposed as it was, the
+ * historic list would show up as a row that REMOVES that entry from the handler's default, and a user approving it
+ * would lose the new behavior without being told. A list without `.excalidraw.md` is a user who opted out of
+ * treating drawings as attachments, and is proposed unchanged.
+ *
+ * @param extensions - The historic list, or `undefined` when the user never saved one.
+ * @returns The list to propose.
+ */
+function addExcalidrawPropertyEntry(extensions: readonly string[] | undefined): readonly string[] | undefined {
+  const shouldAdd = extensions?.includes(EXCALIDRAW_EXTENSION) === true && !extensions.includes(EXCALIDRAW_PROPERTY_ENTRY);
+  return shouldAdd ? [...extensions, EXCALIDRAW_PROPERTY_ENTRY] : extensions;
 }
 
 function commentOut($string: string): string {

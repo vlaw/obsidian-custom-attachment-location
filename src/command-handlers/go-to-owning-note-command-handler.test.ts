@@ -32,12 +32,12 @@ interface ActiveFileProviderHolder {
 }
 
 interface TestableHandler {
-  canExecuteFile(file: TFile): boolean;
-  executeFile(file: TFile): Promise<void>;
+  canExecuteFile: (file: TFile) => boolean;
+  executeFile: (file: TFile) => Promise<void>;
   icon: string;
   id: string;
   name: string;
-  shouldAddToFileMenu(): boolean;
+  shouldAddToFileMenu: () => boolean;
 }
 
 vi.mock('obsidian-dev-utils/obsidian/modals/select-item', async (importOriginal) => ({
@@ -94,7 +94,7 @@ describe('GoToOwningNoteCommandHandler', () => {
     });
     findCandidateNotePaths = vi.fn<NoteOwnerResolver['findCandidateNotePaths']>().mockResolvedValue([]);
     // The real resolver keeps every candidate whenever the list decides nothing, which is the default
-    // Every test here but the demotion one wants.
+    // every test here but the demotion one wants.
     filterTopRankNotePaths = vi.fn<NoteOwnerResolver['filterTopRankNotePaths']>().mockImplementation((notePaths) => [...notePaths]);
     pickOwnerNotePath = vi.fn<NoteOwnerResolver['pickOwnerNotePath']>().mockReturnValue(null);
     findNoPriorityWinnerReason = vi.fn<NoteOwnerResolver['findNoPriorityWinnerReason']>()
@@ -179,7 +179,7 @@ describe('GoToOwningNoteCommandHandler', () => {
 
     it('should offer only the notes tying for the best rank', async () => {
       // Issue #74: the list has already ruled the demoted note out, so offering it would invite an
-      // Answer the plugin itself would never have given. The reason is still read off every candidate.
+      // answer the plugin itself would never have given. The reason is still read off every candidate.
       findCandidateNotePaths.mockResolvedValue(['notes/a.md', 'notes/b.md', 'notes/drawing.excalidraw.md']);
       findNoPriorityWinnerReason.mockReturnValue(NoPriorityWinnerReason.Tie);
       filterTopRankNotePaths.mockReturnValue(['notes/a.md', 'notes/b.md']);

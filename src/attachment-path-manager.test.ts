@@ -120,7 +120,7 @@ const mockCreateFolderSafe = vi.mocked(createFolderSafe);
 const mockPromptWithPreview = vi.mocked(promptWithPreview);
 
 // The handed-over settings live in Advanced Rename and Delete Handler since 12.0.0. Mutable here so a test
-// Can still change one mid-run, exactly as it used to change .
+// can still change one mid-run, exactly as it used to change .
 interface MutableHandedOverSettings {
   emptyFolderBehavior: EmptyFolderBehavior;
   notePriorities: readonly string[];
@@ -344,8 +344,7 @@ describe('AttachmentPathManager', () => {
 
       it('should not run the template machinery over a folder name the user typed into Obsidian', async () => {
         context.settings.specialCharacters = '#';
-        // eslint-disable-next-line no-template-curly-in-string -- A literal folder name that merely looks like a token.
-        const folderName = 'Media #1/${noteFileName}';
+        const folderName = 'Media #1/{{noteFileName}}';
         expect(await resolveFor(folderName)).toBe(folderName);
         expect(context.validatePath).not.toHaveBeenCalled();
       });
@@ -412,8 +411,7 @@ describe('AttachmentPathManager', () => {
 
     it('should keep the original file name when the renamed template is empty', async () => {
       context.settings.renamedAttachmentFileName = '';
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.generatedAttachmentFileName = '${prompt}';
+      context.settings.generatedAttachmentFileName = '{{prompt}}';
       const result = await context.manager.getGeneratedAttachmentFileBaseName(createSubstitutions(ActionContext.RenameNote));
       expect(result).toBe('img');
       expect(mockPromptWithPreview).not.toHaveBeenCalled();
@@ -643,8 +641,7 @@ describe('AttachmentPathManager', () => {
 
     it('should use the injected sequence number in the generated name', async () => {
       context.settings.shouldRenameCollectedAttachments = true;
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.collectedAttachmentFileName = 'collected-${sequenceNumber:{length:2}}';
+      context.settings.collectedAttachmentFileName = 'collected-{{sequenceNumber:{length:2}}}';
       context.settings.attachmentFolderPath = 'assets';
       const attachmentFile = createTFile({
         extension: 'png',
@@ -834,8 +831,7 @@ describe('AttachmentPathManager', () => {
       context.settings.attachmentFolderPath = 'assets';
       context.settings.renamedAttachmentFileName = '';
       context.handedOverSettings.shouldRenameAttachmentFiles = false;
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.generatedAttachmentFileName = '${prompt}';
+      context.settings.generatedAttachmentFileName = '{{prompt}}';
       const noteFile = createTFile({ path: 'note.md' });
       mockGetFileOrNull.mockReturnValue(noteFile);
       mockIsNote.mockReturnValue(true);
@@ -858,8 +854,7 @@ describe('AttachmentPathManager', () => {
       context.settings.attachmentFolderPath = 'assets';
       context.settings.renamedAttachmentFileName = '';
       context.handedOverSettings.shouldRenameAttachmentFiles = true;
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.generatedAttachmentFileName = '${prompt}';
+      context.settings.generatedAttachmentFileName = '{{prompt}}';
       const noteFile = createTFile({ path: 'note.md' });
       mockGetFileOrNull.mockReturnValue(noteFile);
       mockIsNote.mockReturnValue(true);
@@ -1217,8 +1212,7 @@ describe('AttachmentPathManager', () => {
   describe('single-pass link walk (via getAvailablePathForAttachments)', () => {
     it('should derive the sequence number and resolve the note cache in a single walk', async () => {
       context.settings.attachmentFolderPath = 'assets';
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.generatedAttachmentFileName = '${sequenceNumber}';
+      context.settings.generatedAttachmentFileName = '{{sequenceNumber}}';
       const noteFile = createTFile({ path: 'note.md' });
       const oldFile = createTFile({ path: 'old.png' });
       const otherFile = createTFile({ path: 'other.png' });
@@ -1244,15 +1238,14 @@ describe('AttachmentPathManager', () => {
         shouldSkipMissingAttachmentFolderCreation: true
       });
       // `old.png` is the 2nd distinct attachment, and the number now comes from exactly ONE `getCacheSafe`
-      // Walk (previously two — one per the collapsed getCursorLine/getSequenceNumber).
+      // walk (previously two — one per the collapsed getCursorLine/getSequenceNumber).
       expect(result).toBe('assets/2.png');
       expect(mockGetCacheSafe).toHaveBeenCalledTimes(1);
     });
 
     it('should derive the cursor line from the matching reference and feed it to the heading token', async () => {
       context.settings.attachmentFolderPath = 'assets';
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.generatedAttachmentFileName = '${heading}';
+      context.settings.generatedAttachmentFileName = '{{heading}}';
       const noteFile = createTFile({ path: 'note.md' });
       const oldFile = createTFile({ path: 'old.png' });
       const matchAtLine4 = strictProxy<ReferenceCache>({
@@ -1278,15 +1271,14 @@ describe('AttachmentPathManager', () => {
         shouldSkipDuplicateCheck: true,
         shouldSkipMissingAttachmentFolderCreation: true
       });
-      // CursorLine 4 flows into the heading token, whose cutoff (line <= 4) selects "Early" (line 2),
-      // Not "Late" (line 6).
+      // cursorLine 4 flows into the heading token, whose cutoff (line <= 4) selects "Early" (line 2),
+      // not "Late" (line 6).
       expect(result).toBe('assets/Early.png');
     });
 
     it('should keep the first matching reference when a later one also matches (line-0 first match wins)', async () => {
       context.settings.attachmentFolderPath = 'assets';
-      // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-      context.settings.generatedAttachmentFileName = '${heading}';
+      context.settings.generatedAttachmentFileName = '{{heading}}';
       const noteFile = createTFile({ path: 'note.md' });
       const oldFile = createTFile({ path: 'old.png' });
       const firstMatchAtLine0 = strictProxy<ReferenceCache>({
@@ -1315,7 +1307,7 @@ describe('AttachmentPathManager', () => {
         shouldSkipMissingAttachmentFolderCreation: true
       });
       // The first match (line 0) wins, so cursorLine is 0 → the heading token treats it as "no cursor" and
-      // Emits nothing. A last-match regression would pick line 5 → cutoff line <= 5 → "Later" (line 3).
+      // emits nothing. A last-match regression would pick line 5 → cutoff line <= 5 → "Later" (line 3).
       expect(result).toBe('assets/.png');
     });
   });

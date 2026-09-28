@@ -29,23 +29,32 @@ import { downloadReleasedPlugin } from './download-released-plugin.ts';
 export const ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID = 'advanced-rename-and-delete-handler';
 
 /**
- * The release seeded. `1.3.0` publishes contract `1.1.0`, the lowest the dependency accepts.
+ * The release seeded. `2.1.0` is the first to recognize an Excalidraw drawing by its `excalidraw-plugin`
+ * property (#90), which `excalidraw-property-unit-folder-cross-plugin.desktop.integration.test.ts` drives.
  */
-export const ADVANCED_RENAME_AND_DELETE_HANDLER_VERSION = '1.3.0';
+export const ADVANCED_RENAME_AND_DELETE_HANDLER_VERSION = '2.1.0';
 
 const ADVANCED_RENAME_AND_DELETE_HANDLER_REPO = 'mnaoumov/obsidian-advanced-rename-and-delete-handler';
 
 // Every vault the harness opens keeps its configuration in the default folder.
 const VAULT_CONFIG_FOLDER = '.obsidian';
 
-const SEEDED_SETTINGS = {
+/**
+ * The settings seeded with it. Exported so a suite that owns its vault outright (the store-screenshot captures)
+ * can write the same record with renames switched on.
+ *
+ * `treatAsAttachmentExtensions` holds `property:excalidraw-plugin` besides this plugin's historic
+ * `.excalidraw.md`, because a user whose historic list is migrated now gets that entry too (see
+ * `convertRenameDeleteSettingsToProposal`).
+ */
+export const ADVANCED_RENAME_AND_DELETE_HANDLER_SEEDED_SETTINGS = {
   emptyFolderBehavior: 'DeleteWithEmptyParents',
   notePriorities: [],
   shouldHandleDeletions: false,
   shouldHandleRenames: false,
   shouldRenameAttachmentFiles: false,
   shouldRenameAttachmentFolder: false,
-  treatAsAttachmentExtensions: ['.excalidraw.md']
+  treatAsAttachmentExtensions: ['.excalidraw.md', 'property:excalidraw-plugin']
 };
 
 /**
@@ -62,7 +71,7 @@ export async function getAdvancedRenameAndDeleteHandlerPopulate(): Promise<Popul
 
   const pluginFolder = `${VAULT_CONFIG_FOLDER}/plugins/${ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID}`;
   return {
-    [`${pluginFolder}/data.json`]: JSON.stringify(SEEDED_SETTINGS),
+    [`${pluginFolder}/data.json`]: JSON.stringify(ADVANCED_RENAME_AND_DELETE_HANDLER_SEEDED_SETTINGS),
     [`${pluginFolder}/main.js`]: files.mainJs,
     [`${pluginFolder}/manifest.json`]: files.manifestJson
   };

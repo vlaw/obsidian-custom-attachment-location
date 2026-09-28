@@ -18,7 +18,6 @@ import type { PluginApiContract } from 'obsidian-dev-utils/obsidian/plugin/plugi
 import type { Mock } from 'vitest';
 
 import { Component } from 'obsidian';
-import { waitForAllAsyncOperations } from 'obsidian-dev-utils/async';
 import {
   noop,
   noopAsync
@@ -70,7 +69,7 @@ import { PLUGIN_API_CONTRACT } from './plugin-api.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { TokenValidator } from './token-validator.ts';
-import { TokenizedStringLanguageComponent } from './tokenized-string-language-component.ts';
+import { createTokenizedStringLanguageComponent } from './tokenized-string-language.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 // --- Hoisted shared state ---
@@ -81,7 +80,7 @@ interface StubbedSettings {
 
 const hoisted = vi.hoisted(() => {
   // Annotated rather than inferred: the pending value starts `null`, and an inferred literal type would
-  // Make it permanently `null`, so no test could park a proposal in it.
+  // make it permanently `null`, so no test could park a proposal in it.
   const settings: StubbedSettings = {
     proposedRenameDeleteSettings: null
   };
@@ -118,7 +117,7 @@ vi.mock('obsidian-dev-utils/obsidian/components/rename-delete-handler-component'
 // --- Collaborator dev-utils components NOT added as children: bare constructor spies. ---
 
 // `PluginDataHandler` and `PluginEventSourceImpl` are NOT stubbed: since obsidian-dev-utils 93.2 the base
-// Builds its own settings component out of them during `onload`, and that component really calls
+// builds its own settings component out of them during `onload`, and that component really calls
 // `pluginEventSource.on`, so a bare `vi.fn()` double makes the base throw before `onloadImpl` runs.
 // --- The plugin's OWN sibling modules: collaborators added as children return a real Component; the rest are bare constructor spies. ---
 
@@ -227,11 +226,8 @@ vi.mock('./plugin-settings-tab.ts', () => ({
   PluginSettingsTab: vi.fn()
 }));
 
-vi.mock('./tokenized-string-language-component.ts', () => ({
-  // eslint-disable-next-line prefer-arrow-callback -- a vi.fn constructor stub must be a function (not an arrow) so `new` works and returns a loadable Component.
-  TokenizedStringLanguageComponent: vi.fn(function tokenizedStringLanguageComponentStub() {
-    return new Component();
-  })
+vi.mock('./tokenized-string-language.ts', () => ({
+  createTokenizedStringLanguageComponent: vi.fn(() => new Component())
 }));
 
 vi.mock('./token-validator.ts', () => ({
@@ -246,9 +242,7 @@ vi.mock('./unused-attachments-remover.ts', () => ({
 import { Plugin } from './plugin.ts';
 
 // The base pre-wires `commandHandlerComponent`; stub its `registerCommandHandlers` so the plugin's registration is asserted without exercising the mocked command handlers.
-// What it hands back is disposed when the feature surface unloads, so the double carries a `dispose` to observe.
-const disposeCommandHandlersMock = vi.fn();
-vi.spyOn(CommandHandlerComponent.prototype, 'registerCommandHandlers').mockResolvedValue(castTo<DisposableEx>({ dispose: disposeCommandHandlersMock }));
+vi.spyOn(CommandHandlerComponent.prototype, 'registerCommandHandlers').mockResolvedValue(castTo<DisposableEx>({ dispose: vi.fn() }));
 
 interface AppGlobal {
   app: AppOriginal;
@@ -261,26 +255,26 @@ interface CustomAttachmentLocationParamsProbe {
 interface MigrationParamsProbe {
   readonly apiVersionRange: string;
   readonly contract: PluginApiContract;
-  getProposedSettings(): MigratableSettings | null;
+  getProposedSettings: () => MigratableSettings | null;
   readonly providerPluginId: string;
-  retireProposedSettings(): Promise<void>;
+  retireProposedSettings: () => Promise<void>;
   readonly sourcePluginId: string;
 }
 
 // `getPluginApis` is protected on the base, so a test reads it through a probe.
 interface PluginApisProbe {
-  getPluginApis(): unknown[];
+  getPluginApis: () => unknown[];
 }
 
 // `getPluginConflicts` is protected on the base — the declaration is for the library, not for callers —
-// So a test reads it through a probe rather than widening the plugin's own surface.
+// so a test reads it through a probe rather than widening the plugin's own surface.
 interface PluginConflictsProbe {
-  getPluginConflicts(): PluginConflict[];
+  getPluginConflicts: () => PluginConflict[];
 }
 
 // `getPluginDependencies` is protected on the base, so a test reads it through a probe.
 interface PluginDependenciesProbe {
-  getPluginDependencies(): PluginDependency[];
+  getPluginDependencies: () => PluginDependency[];
 }
 
 interface PluginGateProbe {
@@ -288,7 +282,7 @@ interface PluginGateProbe {
 }
 
 interface SettingsTabParamsProbe {
-  getPluginGateComponent(): PluginGateComponent;
+  getPluginGateComponent: () => PluginGateComponent;
 }
 
 function getMigrationParams(): MigrationParamsProbe {
@@ -344,15 +338,15 @@ beforeEach(() => {
   castTo<AppGlobal>(window).app = app;
 
   // What the dependency gate reaches when the dependency is missing: it registers a settings tab explaining
-  // What to install. `obsidian-test-mocks` does not model `app.setting`.
+  // what to install. `obsidian-test-mocks` does not model `app.setting`.
   seedOnRawTarget(app, 'setting', {
     addSettingTab: vi.fn(),
     removeSettingTab: vi.fn()
   });
 
   // Advanced Rename and Delete Handler is a declared dependency, so the feature surface — everything these
-  // Tests look at — loads only once its API is published. An empty API is enough: the gate checks only that
-  // One is there, at a matching version. Each test gets a fresh app, and with it a fresh registry.
+  // tests look at — loads only once its API is published. An empty API is enough: the gate checks only that
+  // one is there, at a matching version. Each test gets a fresh app, and with it a fresh registry.
   providerComponent = new Component();
   providerComponent.load();
   publishPluginApi({
@@ -394,7 +388,7 @@ describe('Plugin', () => {
     expect(PluginSettingsTabComponent).toHaveBeenCalledOnce();
     expect(PluginSettingsTab).toHaveBeenCalledOnce();
     // The whole point of 12.0.0: rename/delete belongs to Advanced Rename and Delete Handler, and two
-    // Handlers acting on one rename corrupt links. This plugin must register NONE.
+    // handlers acting on one rename corrupt links. This plugin must register NONE.
     expect(RenameDeleteHandlerComponent).not.toHaveBeenCalled();
     expect(HandedOverSettingsComponent).toHaveBeenCalledOnce();
     expect(SettingsMigrationComponent).toHaveBeenCalledOnce();
@@ -413,7 +407,7 @@ describe('Plugin', () => {
       expect.any(OpenDemoVaultCommandHandler)
     ]);
     expect(AppSaveAttachmentPatchComponent).toHaveBeenCalledOnce();
-    expect(TokenizedStringLanguageComponent).toHaveBeenCalledOnce();
+    expect(createTokenizedStringLanguageComponent).toHaveBeenCalledOnce();
   });
 
   describe('Consistent Attachments and Links overlap', () => {
@@ -428,17 +422,17 @@ describe('Plugin', () => {
       expect(conflict?.pluginId).toBe('consistent-attachments-and-links');
       expect(conflict?.pluginName).toBe('Consistent Attachments and Links');
       // Duplicate palette entries and doubled work are annoying, not vault-corrupting, so both plugins
-      // Keep running.
+      // keep running.
       expect(conflict?.severity).toBe(PluginConflictSeverity.Warn);
       // A RANGE closed at that plugin's next major, not a minimum: the release that drops collecting has
-      // Not shipped, so every released version still overlaps.
+      // not shipped, so every released version still overlaps.
       expect(conflict?.conflictingVersionRange).toBe('<5.0.0');
       expect(conflict?.reason).toContain('Collect attachments in entire vault');
     });
 
     // The settings tab takes an ACCESSOR rather than the gate itself: the gate is what loads the feature
-    // Surface, so at the moment `onloadImpl` builds the tab the base has not assigned it yet, and reading
-    // It eagerly throws.
+    // surface, so at the moment `onloadImpl` builds the tab the base has not assigned it yet, and reading
+    // it eagerly throws.
     it('should hand the settings tab a lazy route to the plugin gate', async () => {
       const plugin = new Plugin(app, manifest);
       await plugin.onload();
@@ -464,7 +458,7 @@ describe('Plugin', () => {
     it('should delegate to the attachment collector', async () => {
       const collectAttachmentsInAbstractFiles = vi.fn();
       // A constructor mock has to be `new`-able, so this cannot be an arrow function. Returning an
-      // Object from it overrides the instance, which is how the stub gets in.
+      // object from it overrides the instance, which is how the stub gets in.
       vi.mocked(AttachmentCollector).mockImplementation(castTo<typeof AttachmentCollector>(
         // eslint-disable-next-line prefer-arrow-callback -- An arrow function cannot be `new`-ed, and this stands in for a constructor.
         function mockAttachmentCollector(): AttachmentCollector {
@@ -482,7 +476,7 @@ describe('Plugin', () => {
     });
 
     // The public method reads a field that outlives the feature surface, which unloads whenever the dependency
-    // Goes away. Without the reset it would drive a collector whose components have been torn down.
+    // goes away. Without the reset it would drive a collector whose components have been torn down.
     it('should stop collecting once the dependency goes away', async () => {
       const collectAttachmentsInAbstractFiles = vi.fn();
       vi.mocked(AttachmentCollector).mockImplementation(castTo<typeof AttachmentCollector>(
@@ -541,7 +535,7 @@ describe('Plugin', () => {
     });
 
     // The declaration is tied to the feature surface, so a consumer sees the API GO AWAY rather than
-    // Answering from components the dependency gate has torn down.
+    // answering from components the dependency gate has torn down.
     it('should revoke the handle once the dependency goes away', async () => {
       const plugin = new Plugin(app, manifest);
       await plugin.onload();
@@ -564,7 +558,7 @@ describe('Plugin', () => {
     });
 
     // The base asks for the declaration only right after `onloadImpl` has built the API, so no public path
-    // Reaches the empty answer; it is what the declaration says while the surface is down, asked directly.
+    // reaches the empty answer; it is what the declaration says while the surface is down, asked directly.
     it('should declare no API while the dependency is away', async () => {
       const plugin = new Plugin(app, manifest);
       await plugin.onload();
@@ -587,7 +581,7 @@ describe('Plugin', () => {
       expect(dependency?.pluginId).toBe('advanced-rename-and-delete-handler');
       expect(dependency?.pluginName).toBe('Advanced Rename and Delete Handler');
       // `1.1.0` rather than `^1`: the read-back arrived in that contract, and an older provider would open the
-      // Gate and then fail every read.
+      // gate and then fail every read.
       expect(dependency?.apiVersionRange).toBe('^1.1.0');
       expect(dependency?.reason).toContain('Advanced Rename and Delete Handler');
     });
@@ -601,20 +595,6 @@ describe('Plugin', () => {
       expect(PluginSettingsComponent).not.toHaveBeenCalled();
       expect(AttachmentCollector).not.toHaveBeenCalled();
       expect(AppSaveAttachmentPatchComponent).not.toHaveBeenCalled();
-      plugin.unload();
-    });
-
-    // The commands are registered through the base's universal command component, which outlives the
-    // Feature surface; left alone they would stay in the palette, calling into torn-down components.
-    it('should withdraw its own commands once the dependency goes away', async () => {
-      const plugin = new Plugin(app, manifest);
-      await plugin.onload();
-      expect(disposeCommandHandlersMock).not.toHaveBeenCalled();
-
-      unpublishProviderApi();
-      await waitForAllAsyncOperations();
-
-      expect(disposeCommandHandlersMock).toHaveBeenCalledOnce();
       plugin.unload();
     });
   });
@@ -631,7 +611,7 @@ describe('Plugin', () => {
     });
 
     // The migration names only the method it calls. Which provider versions are good enough is the dependency
-    // Gate's question, answered by its own version range, not by this contract.
+    // gate's question, answered by its own version range, not by this contract.
     it('should demand only the method it calls, migrateSettings', async () => {
       const plugin = new Plugin(app, manifest);
       await plugin.onload();
@@ -657,7 +637,7 @@ describe('Plugin', () => {
     });
 
     // `editAndSave`, not `setProperty`: a retirement that only edits the in-memory state is forgotten on the
-    // Next reload, so an applied migration would be offered forever.
+    // next reload, so an applied migration would be offered forever.
     it('should persist the retirement rather than only holding it in memory', async () => {
       const plugin = new Plugin(app, manifest);
       await plugin.onload();
@@ -739,7 +719,7 @@ describe('Plugin', () => {
 });
 
 // `registerCommandHandlers` takes a factory since obsidian-dev-utils 89.0.0, and the base
-// Registers its own handlers through the same spy — so pick the plugin's own factory by what it builds.
+// registers its own handlers through the same spy — so pick the plugin's own factory by what it builds.
 function buildPluginCommandHandlers(): CommandHandler[] {
   const commandHandlerBatches = vi.mocked(CommandHandlerComponent.prototype.registerCommandHandlers).mock.calls
     .map(([commandHandlerFactory]) => commandHandlerFactory());

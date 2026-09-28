@@ -23,8 +23,7 @@ import { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/pl
 import {
   isCanvasFile,
   isFile,
-  isFolder,
-  isNote
+  isFolder
 } from 'obsidian-dev-utils/obsidian/file-system';
 import { initI18N } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { extractLinkFile } from 'obsidian-dev-utils/obsidian/link';
@@ -62,7 +61,7 @@ import { confirmMinimizable } from './modals/minimizable-confirm-modal.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 interface QueueParamsLike {
-  operationFunction(abortSignal: AbortSignal): Promise<void>;
+  operationFunction: (abortSignal: AbortSignal) => Promise<void>;
   operationName: string;
 }
 
@@ -72,11 +71,11 @@ interface RenderInternalLinkParamsLike {
 
 interface SettingsLike {
   emptyFolderBehavior: EmptyFolderBehavior;
-  getTimeoutInMilliseconds(): number;
-  isAttachmentUnitFolder(path: string): boolean;
-  isExcludedFromMultipleNotesCheck(path: string): boolean;
-  isOrphanAttachmentScanCandidate(path: string): boolean;
-  isPathIgnored(path: string): boolean;
+  getTimeoutInMilliseconds: () => number;
+  isAttachmentUnitFolder: (path: string) => boolean;
+  isExcludedFromMultipleNotesCheck: (path: string) => boolean;
+  isOrphanAttachmentScanCandidate: (path: string) => boolean;
+  isPathIgnored: (path: string) => boolean;
 }
 
 vi.mock('obsidian-dev-utils/obsidian/canvas', async (importOriginal) => ({
@@ -88,8 +87,7 @@ vi.mock('obsidian-dev-utils/obsidian/file-system', async (importOriginal) => ({
   ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/file-system')>(),
   isCanvasFile: vi.fn(),
   isFile: vi.fn(),
-  isFolder: vi.fn(),
-  isNote: vi.fn()
+  isFolder: vi.fn()
 }));
 
 vi.mock('obsidian-dev-utils/obsidian/link', async (importOriginal) => ({
@@ -105,7 +103,7 @@ vi.mock('obsidian-dev-utils/obsidian/metadata-cache', async (importOriginal) => 
 }));
 
 // The real renderer goes through Obsidian's markdown renderer; a bare anchor naming the path is all the
-// Dialog's text needs.
+// dialog's text needs.
 vi.mock('obsidian-dev-utils/obsidian/markdown', async (importOriginal) => ({
   ...await importOriginal<typeof import('obsidian-dev-utils/obsidian/markdown')>(),
   renderInternalLink: vi.fn(async (params: RenderInternalLinkParamsLike) => {
@@ -134,7 +132,6 @@ const mockGetCanvasReferences = vi.mocked(getCanvasReferences);
 const mockIsCanvasFile = vi.mocked(isCanvasFile);
 const mockIsFile = vi.mocked(isFile);
 const mockIsFolder = vi.mocked(isFolder);
-const mockIsNote = vi.mocked(isNote);
 const mockExtractLinkFile = vi.mocked(extractLinkFile);
 const mockGetBacklinksForFileSafe = vi.mocked(getBacklinksForFileSafe);
 const mockGetCacheSafe = vi.mocked(getCacheSafe);
@@ -311,11 +308,29 @@ describe('UnusedAttachmentsRemover', () => {
   describe('gathering note files', () => {
     it('should skip a single file that is not a note', async () => {
       mockIsFile.mockReturnValue(true);
-      mockIsNote.mockReturnValue(false);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockReturnValue(false);
       mockIsFolder.mockReturnValue(false);
       await runOperation([createFile('image.png')]);
       expect(mockGetCacheSafe).not.toHaveBeenCalled();
       expect(showNoticeSpy).toHaveBeenCalledExactlyOnceWith('No unused attachments found.');
+    });
+
+    /*
+     * A `.excalidraw.md` is Markdown on disk, so the extension-based `isNote` this walk used to ask called
+     * it a note and scanned it as one. A drawing is an attachment of the note embedding it, not an owner
+     * of an attachment folder, so that scan judged the folder its path resolves to as if it owned it.
+     * The plain note beside it is what proves the walk is still running rather than refusing everything.
+     */
+    it('should skip a drawing the user treats as an attachment while still scanning a plain note', async () => {
+      const note = createFile('note.md');
+      const drawing = createFile('drawing.excalidraw.md');
+      // `recurseChildren` visits the attachment folder itself first, as Obsidian does, so it must not pass for a file.
+      mockIsFile.mockImplementation((f) => f !== attachmentFolder);
+      mockIsFolder.mockReturnValue(false);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note);
+      mockGetCacheSafe.mockResolvedValue(null);
+      await runOperation([note, drawing]);
+      expect(mockGetCacheSafe).toHaveBeenCalledExactlyOnceWith(app, note);
     });
 
     it('should collect notes from files and recurse folders (skipping non-note children)', async () => {
@@ -325,7 +340,7 @@ describe('UnusedAttachmentsRemover', () => {
       const childNonNote = createFile('folder/img.png');
       mockIsFile.mockImplementation((f) => f !== folder);
       mockIsFolder.mockImplementation((f) => f === folder);
-      mockIsNote.mockImplementation((f) => f === note || f === childNote);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === childNote);
       mockGetCacheSafe.mockResolvedValue(null);
       const recurseSpy = vi.spyOn(Vault, 'recurseChildren').mockImplementation((root, callback) => {
         if (root !== folder) {
@@ -347,14 +362,14 @@ describe('UnusedAttachmentsRemover', () => {
     });
 
     // A folder inside a walked folder arrives through the same callback as a file. It is skipped here and
-    // Reached on its own, so a nested folder is never mistaken for a note and never scanned as one.
+    // reached on its own, so a nested folder is never mistaken for a note and never scanned as one.
     it('should skip a folder child while recursing', async () => {
       const folder = strictProxy<TAbstractFile>({ path: 'folder' });
       const childFolder = strictProxy<TAbstractFile>({ path: 'folder/nested' });
       const childNote = createFile('folder/child.md');
       mockIsFile.mockImplementation((f) => f !== folder && f !== childFolder);
       mockIsFolder.mockImplementation((f) => f === folder || f === childFolder);
-      mockIsNote.mockImplementation((f) => f === childNote);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === childNote);
       mockGetCacheSafe.mockResolvedValue(null);
       const recurseSpy = vi.spyOn(Vault, 'recurseChildren').mockImplementation((root, callback) => {
         if (root !== folder) {
@@ -377,7 +392,7 @@ describe('UnusedAttachmentsRemover', () => {
     it('should skip an ignored note without scanning it', async () => {
       const note = createFile('note.md');
       mockIsFile.mockReturnValue(true);
-      mockIsNote.mockReturnValue(true);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockReturnValue(true);
       mockIsFolder.mockReturnValue(false);
       vi.mocked(settings.isPathIgnored).mockReturnValue(true);
       await runOperation([note]);
@@ -392,8 +407,9 @@ describe('UnusedAttachmentsRemover', () => {
 
     beforeEach(() => {
       note = createFile('note.md');
-      mockIsFile.mockReturnValue(true);
-      mockIsNote.mockImplementation((f) => f === note);
+      // `recurseChildren` visits the attachment folder itself first, as Obsidian does, so it must not pass for a file.
+      mockIsFile.mockImplementation((f) => f !== attachmentFolder);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note);
       mockIsFolder.mockReturnValue(false);
       mockIsCanvasFile.mockReturnValue(false);
       mockGetCacheSafe.mockResolvedValue(strictProxy<CachedMetadataEx>({}));
@@ -448,8 +464,9 @@ describe('UnusedAttachmentsRemover', () => {
       mockGetLinks.mockReturnValue([createReference('referenced.png')]);
       mockExtractLinkFile.mockReturnValue(referenced);
       mockIsFile.mockImplementation((f) => f !== subFolder);
-      mockIsNote.mockImplementation((f) => f === note);
-      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === noteInFolder);
+      // One predicate answers both halves now: `note` is the note the sweep scans, and `noteInFolder` is a
+      // note sitting INSIDE the attachment folder, which is therefore never a candidate to trash.
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === noteInFolder);
       const recurseSpy = vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
         callback(subFolder);
         callback(noteInFolder);
@@ -492,7 +509,7 @@ describe('UnusedAttachmentsRemover', () => {
         callback(unused);
       });
       // `note.md` is the source note (self-reference) and `drawing.excalidraw.md` is excluded, so the
-      // Effective backlink count is zero and the attachment is treated as unused.
+      // effective backlink count is zero and the attachment is treated as unused.
       mockGetBacklinksForFileSafe.mockResolvedValue(createBacklinks(['note.md', 'drawing.excalidraw.md']));
       vi.mocked(settings.isExcludedFromMultipleNotesCheck).mockImplementation((path) => path === 'drawing.excalidraw.md');
       mockConfirm.mockResolvedValue(true);
@@ -548,7 +565,7 @@ describe('UnusedAttachmentsRemover', () => {
       beforeEach(() => {
         image = createFile(`${ATTACHMENT_FOLDER_PATH}/test.png`);
         other = createFile('other.md');
-        mockIsNote.mockImplementation((f) => f === note || f === other);
+        vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === other);
         // Only the other note's text names the image, and the backlink index knows nothing of it.
         cachedRead.mockImplementation((file) => Promise.resolve(file === other ? '![[test.png]]\n' : ''));
         mockExtractLinkFile.mockImplementation((params) => params.link.link === 'test.png' ? image : null);
@@ -569,7 +586,7 @@ describe('UnusedAttachmentsRemover', () => {
 
       it('should keep an attachment several other scanned notes name', async () => {
         const third = createFile('third.md');
-        mockIsNote.mockImplementation((f) => [note, other, third].includes(castTo<TFile>(f)));
+        vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => [note, other, third].includes(castTo<TFile>(f)));
         cachedRead.mockImplementation((file) => Promise.resolve(file === note ? '' : '![[test.png]]\n'));
         await runOperation([note, other, third]);
         expect(mockTrashSafe).not.toHaveBeenCalled();
@@ -611,7 +628,7 @@ describe('UnusedAttachmentsRemover', () => {
       unitFolder = createFolder(UNIT_FOLDER_PATH);
 
       mockIsFile.mockReturnValue(true);
-      mockIsNote.mockImplementation((f) => f === note);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note);
       mockIsFolder.mockReturnValue(false);
       mockIsCanvasFile.mockReturnValue(false);
       mockGetCacheSafe.mockResolvedValue(strictProxy<CachedMetadataEx>({}));
@@ -672,7 +689,7 @@ describe('UnusedAttachmentsRemover', () => {
 
     it('should keep the unit whole when only the text of a note outside it names a member (#89)', async () => {
       const other = createFile('other.md');
-      mockIsNote.mockImplementation((f) => f === note || f === other);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === other);
       cachedRead.mockImplementation((file) => Promise.resolve(file === other ? '![[img.png]]\n' : ''));
       mockExtractLinkFile.mockImplementation((params) => params.link.link === 'img.png' ? image : null);
       backlinksByPath.set(image.path, [drawing.path]);
@@ -680,13 +697,17 @@ describe('UnusedAttachmentsRemover', () => {
       expect(mockTrashSafe).not.toHaveBeenCalled();
     });
 
-    it('should not let the text of a note inside the unit keep it alive', async () => {
-      // The drawing is an `.md`, so a wider scope scans it as a note — its embed of a sibling is still the unit describing itself.
-      mockIsNote.mockImplementation((f) => f === note || f === drawing);
+    it('should not let the text of a drawing inside the unit keep it alive', async () => {
+      /*
+       * The drawing is an `.md`, and a wider scope used to scan it as a note. It is treated as an
+       * attachment, so the sweep neither scans it nor reads its text — and its embed of a sibling is the
+       * unit describing itself either way.
+       */
       cachedRead.mockImplementation((file) => Promise.resolve(file === drawing ? '![[img.png]]\n' : ''));
       mockExtractLinkFile.mockImplementation((params) => params.link.link === 'img.png' ? image : null);
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note, drawing]);
+      expect(cachedRead).not.toHaveBeenCalledWith(drawing);
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
     });
 
@@ -711,7 +732,7 @@ describe('UnusedAttachmentsRemover', () => {
        */
       const scratch = createFile(`${UNIT_FOLDER_PATH}/scratch.md`);
       unitMembers = [drawing, image, scratch];
-      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === scratch);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === scratch);
       cachedRead.mockResolvedValue('Some notes.');
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
@@ -723,7 +744,7 @@ describe('UnusedAttachmentsRemover', () => {
       // The `Untitled.md` Obsidian leaves behind when a note is created and never written in (#83).
       const untitled = createFile(`${UNIT_FOLDER_PATH}/Untitled.md`);
       unitMembers = [drawing, image, untitled];
-      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === untitled);
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
       // The scanning note is read for its links (#89); of the unit, only the note is read.
@@ -734,7 +755,7 @@ describe('UnusedAttachmentsRemover', () => {
     it('should treat a note holding only whitespace as empty', async () => {
       const blank = createFile(`${UNIT_FOLDER_PATH}/blank.md`);
       unitMembers = [drawing, image, blank];
-      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === blank);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === blank);
       cachedRead.mockResolvedValue(' \n\t\n');
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
@@ -745,7 +766,7 @@ describe('UnusedAttachmentsRemover', () => {
       const untitled = createFile(`${UNIT_FOLDER_PATH}/Untitled.md`);
       const scratch = createFile(`${UNIT_FOLDER_PATH}/scratch.md`);
       unitMembers = [drawing, image, untitled, scratch];
-      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === untitled || f === scratch);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => [note, scratch, untitled].includes(castTo<TFile>(f)));
       cachedRead.mockImplementation((file) => Promise.resolve(file === scratch ? 'Some notes.' : ''));
       backlinksByPath.set(image.path, [drawing.path]);
       await runOperation([note]);
@@ -776,9 +797,9 @@ describe('UnusedAttachmentsRemover', () => {
 
     it('should trash a unit folder once when several notes reach it', async () => {
       // Every note whose attachment folder holds the unit reports it, so it has to be deduplicated
-      // Before the trash loop: trashing the same folder twice throws on the second call.
+      // before the trash loop: trashing the same folder twice throws on the second call.
       const otherNote = createFile('other-note.md');
-      mockIsNote.mockImplementation((f) => f === note || f === otherNote);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note || f === otherNote);
       backlinksByPath.set(image.path, [drawing.path]);
 
       await runOperation([note, otherNote]);
@@ -877,7 +898,7 @@ describe('UnusedAttachmentsRemover', () => {
       unusedA = createFile(`${ATTACHMENT_FOLDER_PATH}/a.png`);
       unusedB = createFile('other-folder/b.png');
       mockIsFile.mockReturnValue(true);
-      mockIsNote.mockImplementation((f) => f === note);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => f === note);
       mockIsFolder.mockReturnValue(false);
       mockIsCanvasFile.mockReturnValue(false);
       mockGetCacheSafe.mockResolvedValue(strictProxy<CachedMetadataEx>({}));
@@ -904,7 +925,7 @@ describe('UnusedAttachmentsRemover', () => {
 
     // An attachment at the top level of the vault has no parent folder to clean up: `dirname` answers `.`,
     // A path no folder in the vault has, and the empty-folder cleanup walks UPWARDS from whatever it is
-    // Handed. Recording it would send that walk above the vault root.
+    // handed. Recording it would send that walk above the vault root.
     it('should not record the vault root as a folder to clean up', async () => {
       const unusedRoot = createFile('root.png');
       vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
@@ -955,7 +976,7 @@ describe('UnusedAttachmentsRemover', () => {
 
     it('should cap the list and summarize the rest', async () => {
       // Vault-wide this dialog can be handed thousands of paths; an unbounded list is a wall the user
-      // Scrolls past rather than a safety check.
+      // scrolls past rather than a safety check.
       const many = Array.from({ length: 60 }, (_unused, index) => createFile(`${ATTACHMENT_FOLDER_PATH}/many-${index.toString().padStart(2, '0')}.png`));
       vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
         for (const file of many) {
@@ -984,7 +1005,7 @@ describe('UnusedAttachmentsRemover', () => {
       const rootFolder = vaultRootFolder;
       const note = createFile('deep/note.md');
       mockIsFile.mockImplementation((f) => f === note);
-      mockIsNote.mockReturnValue(true);
+      vi.mocked(pluginSettingsComponent.isNoteEx).mockReturnValue(true);
       mockIsFolder.mockImplementation((f) => f === rootFolder);
       mockGetCacheSafe.mockResolvedValue(null);
       vi.spyOn(Vault, 'recurseChildren').mockImplementation((root, callback) => {
@@ -1044,11 +1065,11 @@ describe('UnusedAttachmentsRemover', () => {
       mockIsFile.mockImplementation((f) => f !== vaultRootFolder);
       mockIsFolder.mockImplementation((f) => f === vaultRootFolder);
       /*
-       * Both predicates are driven off one list, because the sweep reads them against each other: the scope
-       * walk gathers notes with `isNote` and rejects orphan candidates with `isNoteEx`. Letting them
-       * disagree by accident makes a note its own attachment, which no real vault does.
+       * ONE predicate drives both halves of the walk — the notes it gathers and the orphan candidates it
+       * rejects — because the sweep reads them against each other, and two answers that disagree make a
+       * note its own attachment, which no real vault does. They used to be two (`isNote` and `isNoteEx`),
+       * and a `.excalidraw.md` is exactly where they disagreed.
        */
-      mockIsNote.mockImplementation((f) => noteFiles.includes(castTo<TFile>(f)));
       vi.mocked(pluginSettingsComponent.isNoteEx).mockImplementation((f) => noteFiles.includes(castTo<TFile>(f)));
       mockIsCanvasFile.mockReturnValue(false);
       mockGetCacheSafe.mockResolvedValue(strictProxy<CachedMetadataEx>({}));
@@ -1149,8 +1170,8 @@ describe('UnusedAttachmentsRemover', () => {
     });
 
     // More than one candidate is what turns this pass's progress bar on and what makes the ordering
-    // Observable at all: the candidates are sorted by path so the confirmation lists them the same way
-    // Twice running, rather than in whatever order the vault walk happened to yield them.
+    // observable at all: the candidates are sorted by path so the confirmation lists them the same way
+    // twice running, rather than in whatever order the vault walk happened to yield them.
     it('should judge several unowned attachments in path order, behind a progress bar', async () => {
       const later = createFile(`${ORPHAN_FOLDER_PATH}/b-later.png`);
       const earlier = createFile(`${ORPHAN_FOLDER_PATH}/a-earlier.png`);

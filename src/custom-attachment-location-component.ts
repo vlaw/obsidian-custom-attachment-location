@@ -70,11 +70,7 @@ export class CustomAttachmentLocationComponent extends LayoutReadyComponent {
    * @returns The resolved folder, or `null`.
    */
   public get currentAttachmentFolderPath(): null | string {
-    if (this.pluginSettingsComponent.settings.shouldFollowObsidianAttachmentLocation) {
-      return null;
-    }
-
-    return this._currentAttachmentFolderPath;
+    return this.pluginSettingsComponent.settings.shouldFollowObsidianAttachmentLocation ? null : this._currentAttachmentFolderPath;
   }
 
   private _currentAttachmentFolderPath: null | string = null;
@@ -121,6 +117,12 @@ export class CustomAttachmentLocationComponent extends LayoutReadyComponent {
   }
 
   protected override async onLayoutReady(): Promise<void> {
+    /*
+     * On an enable after layout-ready this runs while the settings component is still reading `data.json`, so
+     * `customTokensStr` would still be the default. The reload below is not redundant: the first load validated
+     * the stored templates before any custom token existed, so it runs again once they are registered.
+     */
+    await this.pluginSettingsComponent.whenLoadedFromFile();
     Substitutions.registerCustomTokens(this.pluginSettingsComponent.settings.customTokensStr);
     await this.pluginSettingsComponent.loadFromFile(false);
 
@@ -229,15 +231,7 @@ export class CustomAttachmentLocationComponent extends LayoutReadyComponent {
   }
 
   private async handleActiveLeafChange(leaf: null | WorkspaceLeaf): Promise<void> {
-    if (this.isMarkdownViewPatched) {
-      return;
-    }
-
-    if (!leaf) {
-      return;
-    }
-
-    if (leaf.view.getViewType() !== ViewType.Markdown) {
+    if (this.isMarkdownViewPatched || leaf?.view.getViewType() !== ViewType.Markdown) {
       return;
     }
 
@@ -278,11 +272,7 @@ export class CustomAttachmentLocationComponent extends LayoutReadyComponent {
   }
 
   private handleInputFileChange($event: Event): void {
-    if (!($event.target instanceof HTMLInputElement)) {
-      return;
-    }
-
-    if ($event.target.type !== 'file') {
+    if (!($event.target instanceof HTMLInputElement) || $event.target.type !== 'file') {
       return;
     }
 

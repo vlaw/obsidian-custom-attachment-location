@@ -10,6 +10,7 @@ import {
   ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
   ADVANCED_RENAME_AND_DELETE_HANDLER_VERSION
 } from '../scripts/helpers/advanced-rename-and-delete-handler-seed.ts';
+import { findPluginSettingsComponent } from '../scripts/helpers/plugin-settings-component-finder.ts';
 
 /*
  * The acceptance run for issue #71, with BOTH real plugins on one live vault.
@@ -128,7 +129,7 @@ interface ProbeResult {
   readonly isHandlerLoaded: boolean;
 
   /**
-   * Whether this plugin's live settings object was found.
+   * Whether this plugin's settings component was found.
    */
   readonly isSettingsFound: boolean;
 
@@ -164,6 +165,7 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
         backlinkCount,
         chosenButtonText,
         expectedModalTitle,
+        findPluginSettingsComponent: findSettingsComponent,
         handlerPluginId,
         lib: { waitUntil },
         migrationModalTitlePrefix,
@@ -174,7 +176,7 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
       }): Promise<ProbeResult> {
         interface AttachmentFolderSettings {
           attachmentFolderPath: string;
-          isAttachmentUnitFolder(path: string): boolean;
+          isAttachmentUnitFolder: (path: string) => boolean;
         }
 
         interface MigratableSettingsLike {
@@ -201,12 +203,29 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
         }
 
         interface HandlerApiLike {
-          getSettings(): HandedOverSettingsLike;
-          migrateSettings(params: MigrateSettingsParamsLike): Promise<MigrateSettingsResultLike>;
+          getSettings: () => HandedOverSettingsLike;
+          migrateSettings: (params: MigrateSettingsParamsLike) => Promise<MigrateSettingsResultLike>;
         }
 
-        interface PluginWithApiLike {
-          readonly api: HandlerApiLike;
+        interface ApiRecord {
+          readonly api: unknown;
+          readonly isRevoked: boolean;
+        }
+
+        interface ObsidianDevUtilsWrapper {
+          readonly __obsidianDevUtils: ObsidianDevUtilsState;
+        }
+
+        interface ObsidianDevUtilsState {
+          readonly pluginApiRegistry?: RegistryWrapper;
+        }
+
+        interface RegistryWrapper {
+          readonly value?: RegistryValue;
+        }
+
+        interface RegistryValue {
+          readonly records?: Record<string, ApiRecord[]>;
         }
 
         function isAttachmentFolderSettings(value: unknown): value is AttachmentFolderSettings {
@@ -215,47 +234,14 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
         }
 
         /*
-         * The plugin does not expose its settings publicly, so the live object the patch component reads is
-         * located by walking the plugin's component tree — the same walk the sibling cross-plugin suite uses.
+         * The handler publishes its API through the plugin API registry alone since 2.0.0, which removed the
+         * `api` getter on its plugin instance.
          */
-        function findSettings(): AttachmentFolderSettings | null {
-          const block = new Set(['app', 'containerEl', 'dom', 'metadataCache', 'plugins', 'vault', 'workspace']);
-          const seen = new Set<unknown>();
-          const queue: unknown[] = [app.plugins.getPlugin(pluginId)];
-          let budget = 12_000;
-          while (queue.length > 0 && budget-- > 0) {
-            const current = queue.shift();
-            if (current === null || (typeof current !== 'object' && typeof current !== 'function') || seen.has(current)) {
-              continue;
-            }
-            seen.add(current);
-            const record = current as Record<string, unknown>;
-            if (isAttachmentFolderSettings(record['settings'])) {
-              return record['settings'];
-            }
-            let values: unknown[] = [];
-            if (Array.isArray(current)) {
-              values = current;
-            } else if (current instanceof Map) {
-              values = [...current.values()];
-            } else {
-              for (const [key, value] of Object.entries(record)) {
-                if (!block.has(key)) {
-                  values.push(value);
-                }
-              }
-            }
-            for (const value of values) {
-              if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
-                queue.push(value);
-              }
-            }
-          }
-          return null;
-        }
-
-        function hasApi(candidate: object): candidate is PluginWithApiLike {
-          return 'api' in candidate;
+        function findHandlerApi(): HandlerApiLike | null {
+          const registryState = (window as Partial<ObsidianDevUtilsWrapper>).__obsidianDevUtils;
+          const api = registryState?.pluginApiRegistry?.value?.records?.[handlerPluginId]?.find((candidate) => !candidate.isRevoked)?.api;
+          const record = api as null | Record<string, unknown> | undefined;
+          return record && typeof record['migrateSettings'] === 'function' ? api as HandlerApiLike : null;
         }
 
         /**
@@ -326,11 +312,11 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
           }
         }
 
-        const foundSettings = findSettings();
-        if (!foundSettings) {
+        const settingsComponent = findSettingsComponent(app.plugins.getPlugin(pluginId), isAttachmentFolderSettings);
+        if (!settingsComponent) {
           return {
             buttonTexts: [],
-            diagnostics: 'this plugin\'s live settings object was not found',
+            diagnostics: 'this plugin\'s settings component was not found',
             doesDeletedFolderStillExist: false,
             handlerVersion: '',
             isHandlerLoaded: false,
@@ -341,9 +327,6 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
             survivingRelativePaths: []
           };
         }
-
-        // A narrowed `const` does not stay narrowed inside a function declaration below it.
-        const settings: AttachmentFolderSettings = foundSettings;
 
         /*
          * One Obsidian instance is shared with every other integration file, so every path is stamped and
@@ -357,7 +340,7 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
         const alphaNotePath = `${root}/alpha/Alpha.md`;
         const bravoNotePath = `${root}/bravo/Bravo.md`;
 
-        const priorAttachmentFolderPath = settings.attachmentFolderPath;
+        const priorAttachmentFolderPath = settingsComponent.settings.attachmentFolderPath;
         const priorAlwaysUpdateLinks = app.vault.getConfig('alwaysUpdateLinks');
         let handlerApi: HandlerApiLike | null = null;
         let priorHandlerSettings: MigratableSettingsLike | null = null;
@@ -367,14 +350,13 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
           await waitUntil({
             message: 'the handler plugin never published its API',
             predicate: () => {
-              const candidate = app.plugins.plugins[handlerPluginId];
-              return candidate !== undefined && hasApi(candidate);
+              return findHandlerApi() !== null;
             },
             timeoutInMilliseconds: waitTimeoutInMilliseconds
           });
 
-          const handlerPlugin = app.plugins.plugins[handlerPluginId];
-          if (!handlerPlugin || !hasApi(handlerPlugin)) {
+          const foundHandlerApi = findHandlerApi();
+          if (!foundHandlerApi) {
             return {
               buttonTexts: [],
               diagnostics: 'the handler plugin loaded but exposes no API',
@@ -390,7 +372,7 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
           }
 
           // The handler outlives this file, so what it held is handed back in the `finally` below.
-          handlerApi = handlerPlugin.api;
+          handlerApi = foundHandlerApi;
           const currentHandlerSettings = handlerApi.getSettings();
           priorHandlerSettings = {
             notePriorities: currentHandlerSettings.notePriorities,
@@ -421,7 +403,9 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
            * folders. Without that the destination would be the same wherever the dialog's answer pointed, and
            * this file would assert nothing about whose policy computed it.
            */
-          settings.attachmentFolderPath = './assets';
+          await settingsComponent.editAndSave((settings) => {
+            settings.attachmentFolderPath = './assets';
+          });
 
           await app.vault.createFolder(`${deletedFolderPath}/assets`);
           await app.vault.createFolder(`${root}/alpha`);
@@ -508,7 +492,9 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
               .sort((left, right) => left.localeCompare(right))
           };
         } finally {
-          settings.attachmentFolderPath = priorAttachmentFolderPath;
+          await settingsComponent.editAndSave((settings) => {
+            settings.attachmentFolderPath = priorAttachmentFolderPath;
+          });
           app.vault.setConfig('alwaysUpdateLinks', priorAlwaysUpdateLinks);
 
           /*
@@ -529,6 +515,7 @@ describe('Deleting a folder whose shared attachment ties at the top of the note-
         backlinkCount: EXPECTED_BACKLINK_COUNT,
         chosenButtonText: CHOSEN_BUTTON_TEXT,
         expectedModalTitle: EXPECTED_MODAL_TITLE,
+        findPluginSettingsComponent,
         handlerPluginId: HANDLER_PLUGIN_ID,
         migrationModalTitlePrefix: MIGRATION_MODAL_TITLE_PREFIX,
         pluginId: PLUGIN_ID,

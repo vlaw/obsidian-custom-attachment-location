@@ -12,7 +12,7 @@ export const SAMPLE_CUSTOM_TOKENS = String.raw`registerCustomToken('foo', (ctx) 
 registerCustomToken('bar', async (ctx) => {
   await sleep(100);
   const formatValue = ctx.format?.formatKey ?? 'defaultFormatValue';
-  const filledTemplate = await ctx.fillTemplate('qux \${quux} corge \${grault:{garply:\'waldo\'}} fred');
+  const filledTemplate = await ctx.fillTemplate('qux {{quux}} corge {{grault:{garply:\'waldo\'}}} fred');
   return ctx.noteFileName + ctx.app.appId + formatValue + ctx.obsidian.apiVersion + filledTemplate;
 });`;
 
@@ -59,7 +59,7 @@ export enum MoveAttachmentToProperFolderUsedByMultipleNotesMode {
  * there forever. This mode adds a second, attachment-driven pass for exactly that case.
  *
  * The scope has to be NAMED rather than derived. `attachmentFolderPath` is a per-note template and cannot be
- * run backwards — `${prompt}` and `${random}` throw away the very value the folder name was built from, and
+ * run backwards — `{{prompt}}` and `{{random}}` throw away the very value the folder name was built from, and
  * two notes can resolve to one folder — so there is no vault-wide attachment root to enumerate. See the file
  * comment of `note-owner-resolver.ts`, which settles the same point for the other direction.
  *
@@ -89,8 +89,7 @@ export enum RenameAttachmentsCreatedByOtherPluginsMode {
 }
 
 export class PluginSettings {
-  // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-  public attachmentFolderPath = './assets/${noteFileName}';
+  public attachmentFolderPath = './assets/{{noteFileName}}';
   public attachmentRenameMode: AttachmentRenameMode = AttachmentRenameMode.OnlyPastedImages;
   public collectAttachmentUsedByMultipleNotesMode: CollectAttachmentUsedByMultipleNotesMode = CollectAttachmentUsedByMultipleNotesMode.Skip;
   public collectedAttachmentFileName = '';
@@ -101,7 +100,7 @@ export class PluginSettings {
    * The folder twin of {@link collectedAttachmentFileName}, and empty means the same thing there as here:
    * fall back to the setting that governs new attachments, so a user who never opens this sees the behavior
    * they always had. The two destinations are decoupled for the export workflow issue #78 describes — a
-   * shared `_Attachments` folder while a note is being worked on, and a portable `./${noteFileName}.assets`
+   * shared `_Attachments` folder while a note is being worked on, and a portable `./{{noteFileName}}.assets`
    * beside the note once it is collected for export — which until now needed the one setting flipped before
    * each export and flipped back afterwards.
    *
@@ -137,8 +136,7 @@ export class PluginSettings {
    */
   public excludeExtensionsFromMultipleNotesCheck: string[] = [];
 
-  // eslint-disable-next-line no-template-curly-in-string -- Valid token.
-  public generatedAttachmentFileName = 'file-${date:{momentJsFormat:\'YYYYMMDDHHmmssSSS\'}}';
+  public generatedAttachmentFileName = 'file-{{date:{momentJsFormat:\'YYYYMMDDHHmmssSSS\'}}}';
 
   // eslint-disable-next-line no-magic-numbers -- Magic numbers are OK in settings.
   public jpegQuality = 0.8;
@@ -194,7 +192,7 @@ export class PluginSettings {
    * it does over the template.
    *
    * On by default since 13.0.0, so a fresh install changes nothing about where attachments land until the user
-   * picks a pattern. The template default stays `./assets/${noteFileName}`, the default of every earlier
+   * picks a pattern. The template default stays `./assets/{{noteFileName}}`, the default of every earlier
    * release, so a user whose attachments moved on the upgrade switches this off and has the old behavior back.
    */
   public shouldFollowObsidianAttachmentLocation = true;
@@ -271,7 +269,7 @@ export class PluginSettings {
 
   private readonly _attachmentCollectingPaths = new PathSettings();
   // Only the exclude half is exposed: `isPathIgnored` then reduces to "matches one of these
-  // Patterns", which is what a designation list needs. Same shape as `_attachmentCollectingPaths`.
+  // patterns", which is what a designation list needs. Same shape as `_attachmentCollectingPaths`.
   private readonly _attachmentUnitFolderPaths = new PathSettings();
   // eslint-disable-next-line unicorn/name-replacements -- `customTokensStr` is a persisted `data.json` settings key; renaming it would silently drop the user's custom tokens.
   private _customTokensStr = '';
@@ -327,11 +325,7 @@ export class PluginSettings {
     const lowerCasePath = path.toLowerCase();
     return this.excludeExtensionsFromMultipleNotesCheck.some((extension) => {
       const normalizedExtension = extension.trim().replace(/^\./, '').toLowerCase();
-      if (normalizedExtension === '' || /^\.*$/.test(normalizedExtension)) {
-        return false;
-      }
-
-      return lowerCasePath.endsWith(`.${normalizedExtension}`);
+      return normalizedExtension !== '' && !/^\.*$/.test(normalizedExtension) && lowerCasePath.endsWith(`.${normalizedExtension}`);
     });
   }
 
@@ -346,26 +340,21 @@ export class PluginSettings {
    */
   public isOrphanAttachmentScanCandidate(path: string): boolean {
     const mode = this.orphanAttachmentScanMode;
-    if (mode === OrphanAttachmentScanMode.None) {
-      return false;
-    }
 
     /*
-     * Ifs rather than an exhaustive `switch`: `default-case` demands a branch no enum value can reach, and
-     * an unreachable branch is exactly what the coverage bar forbids.
+     * Comparisons rather than an exhaustive `switch`: `default-case` demands a branch no enum value can reach,
+     * and an unreachable branch is exactly what the coverage bar forbids.
      */
-    if (mode === OrphanAttachmentScanMode.EntireVault) {
-      return true;
-    }
-
-    return this._orphanAttachmentScanPaths.isPathIgnored(path);
+    return mode !== OrphanAttachmentScanMode.None
+      && (mode === OrphanAttachmentScanMode.EntireVault || this._orphanAttachmentScanPaths.isPathIgnored(path));
   }
 
   /**
    * Whether the creating plugin has to be identified before an externally created attachment can be judged.
    *
-   * `false` for both non-list modes, which is what keeps the stack capture off the hot path entirely for a
-   * user who never opts into a list.
+   * `false` for both non-list modes, which is what keeps the stack capture off the hot path for a user who never
+   * opts into a list. The one write it still runs for is one into a path this plugin resolved for an outside
+   * caller, which `WriteAttributionPatchComponent` checks separately.
    *
    * @returns `true` when the current mode consults the plugin id.
    */

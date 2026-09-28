@@ -10,6 +10,7 @@ import {
   ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
   ADVANCED_RENAME_AND_DELETE_HANDLER_VERSION
 } from '../scripts/helpers/advanced-rename-and-delete-handler-seed.ts';
+import { findPluginSettingsComponent } from '../scripts/helpers/plugin-settings-component-finder.ts';
 
 /*
  * The follow-up to issue #70, on the layout of the reporter's second sample vault rather than on the one
@@ -100,6 +101,7 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
         app,
         backlinkCount,
         expectedModalTitle,
+        findPluginSettingsComponent: findSettingsComponent,
         handlerPluginId,
         lib: { waitUntil },
         migrationModalTitlePrefix,
@@ -111,7 +113,7 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
         interface UnitFolderSettings {
           attachmentFolderPath: string;
           attachmentUnitFolderPaths: string[];
-          isAttachmentUnitFolder(path: string): boolean;
+          isAttachmentUnitFolder: (path: string) => boolean;
         }
 
         interface MigratableSettingsLike {
@@ -136,58 +138,45 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
         }
 
         interface HandlerApiLike {
-          getSettings(): HandedOverSettingsLike;
-          migrateSettings(params: MigrateSettingsParamsLike): Promise<MigrateSettingsResultLike>;
+          getSettings: () => HandedOverSettingsLike;
+          migrateSettings: (params: MigrateSettingsParamsLike) => Promise<MigrateSettingsResultLike>;
         }
 
-        interface PluginWithApiLike {
-          readonly api: HandlerApiLike;
+        interface ApiRecord {
+          readonly api: unknown;
+          readonly isRevoked: boolean;
         }
 
-        function hasApi(candidate: object): candidate is PluginWithApiLike {
-          return 'api' in candidate;
+        interface ObsidianDevUtilsWrapper {
+          readonly __obsidianDevUtils: ObsidianDevUtilsState;
+        }
+
+        interface ObsidianDevUtilsState {
+          readonly pluginApiRegistry?: RegistryWrapper;
+        }
+
+        interface RegistryWrapper {
+          readonly value?: RegistryValue;
+        }
+
+        interface RegistryValue {
+          readonly records?: Record<string, ApiRecord[]>;
+        }
+
+        /*
+         * The handler publishes its API through the plugin API registry alone since 2.0.0, which removed the
+         * `api` getter on its plugin instance.
+         */
+        function findHandlerApi(): HandlerApiLike | null {
+          const registryState = (window as Partial<ObsidianDevUtilsWrapper>).__obsidianDevUtils;
+          const api = registryState?.pluginApiRegistry?.value?.records?.[handlerPluginId]?.find((candidate) => !candidate.isRevoked)?.api;
+          const record = api as null | Record<string, unknown> | undefined;
+          return record && typeof record['migrateSettings'] === 'function' ? api as HandlerApiLike : null;
         }
 
         function isUnitFolderSettings(value: unknown): value is UnitFolderSettings {
           return typeof value === 'object' && value !== null
             && typeof (value as Record<string, unknown>)['isAttachmentUnitFolder'] === 'function';
-        }
-
-        // The same component-tree walk the sibling cross-plugin suites use.
-        function findSettings(): null | UnitFolderSettings {
-          const block = new Set(['app', 'containerEl', 'dom', 'metadataCache', 'plugins', 'vault', 'workspace']);
-          const seen = new Set<unknown>();
-          const queue: unknown[] = [app.plugins.getPlugin(pluginId)];
-          let budget = 12_000;
-          while (queue.length > 0 && budget-- > 0) {
-            const current = queue.shift();
-            if (current === null || (typeof current !== 'object' && typeof current !== 'function') || seen.has(current)) {
-              continue;
-            }
-            seen.add(current);
-            const record = current as Record<string, unknown>;
-            if (isUnitFolderSettings(record['settings'])) {
-              return record['settings'];
-            }
-            let values: unknown[] = [];
-            if (Array.isArray(current)) {
-              values = current;
-            } else if (current instanceof Map) {
-              values = [...current.values()];
-            } else {
-              for (const [key, value] of Object.entries(record)) {
-                if (!block.has(key)) {
-                  values.push(value);
-                }
-              }
-            }
-            for (const value of values) {
-              if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
-                queue.push(value);
-              }
-            }
-          }
-          return null;
         }
 
         // By title, never a bare `.modal-container` lookup — see this repo's `AGENTS.md`.
@@ -235,12 +224,10 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
           }
         }
 
-        const foundSettings = findSettings();
-        if (!foundSettings) {
+        const settingsComponent = findSettingsComponent(app.plugins.getPlugin(pluginId), isUnitFolderSettings);
+        if (!settingsComponent) {
           throw new Error('this plugin\'s live settings object was not found');
         }
-
-        const settings: UnitFolderSettings = foundSettings;
 
         const stamp = `${Date.now().toString()}-${Math.floor(performance.now()).toString()}`;
         const root = `x-plugin-reporter-vault-${stamp}`;
@@ -250,8 +237,8 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
         const notePathInsideUnit = `${unitFolderPath}/Untitled.md`;
         const adoptingNotePath = `${root}/A/Note.md`;
 
-        const priorAttachmentFolderPath = settings.attachmentFolderPath;
-        const priorUnitFolderPaths = settings.attachmentUnitFolderPaths;
+        const priorAttachmentFolderPath = settingsComponent.settings.attachmentFolderPath;
+        const priorUnitFolderPaths = settingsComponent.settings.attachmentUnitFolderPaths;
         const priorAlwaysUpdateLinks = app.vault.getConfig('alwaysUpdateLinks');
         let handlerApi: HandlerApiLike | null = null;
         let priorHandlerSettings: MigratableSettingsLike | null = null;
@@ -260,18 +247,17 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
           await waitUntil({
             message: 'the handler plugin never published its API',
             predicate: () => {
-              const candidate = app.plugins.plugins[handlerPluginId];
-              return candidate !== undefined && hasApi(candidate);
+              return findHandlerApi() !== null;
             },
             timeoutInMilliseconds: waitTimeoutInMilliseconds
           });
 
-          const handlerPlugin = app.plugins.plugins[handlerPluginId];
-          if (!handlerPlugin || !hasApi(handlerPlugin)) {
+          const foundHandlerApi = findHandlerApi();
+          if (!foundHandlerApi) {
             throw new Error('the handler plugin loaded but exposes no API');
           }
 
-          handlerApi = handlerPlugin.api;
+          handlerApi = foundHandlerApi;
           const currentHandlerSettings = handlerApi.getSettings();
           priorHandlerSettings = {
             shouldHandleDeletions: currentHandlerSettings.shouldHandleDeletions,
@@ -290,8 +276,10 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
           });
 
           app.vault.setConfig('alwaysUpdateLinks', true);
-          settings.attachmentFolderPath = reporterAttachmentFolderPath;
-          settings.attachmentUnitFolderPaths = [reporterUnitFolderPattern];
+          await settingsComponent.editAndSave((settings) => {
+            settings.attachmentFolderPath = reporterAttachmentFolderPath;
+            settings.attachmentUnitFolderPaths = [reporterUnitFolderPattern];
+          });
 
           await app.vault.createFolder(unitFolderPath);
           await app.vault.createFolder(`${root}/A`);
@@ -308,7 +296,7 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
             timeoutInMilliseconds: waitTimeoutInMilliseconds
           });
 
-          const isUnitFolderDesignated = settings.isAttachmentUnitFolder(unitFolderPath);
+          const isUnitFolderDesignated = settingsComponent.settings.isAttachmentUnitFolder(unitFolderPath);
 
           const deletedFolder = app.vault.getFolderByPath(deletedFolderPath);
           if (!deletedFolder) {
@@ -365,8 +353,10 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
               .sort((left, right) => left.localeCompare(right))
           };
         } finally {
-          settings.attachmentFolderPath = priorAttachmentFolderPath;
-          settings.attachmentUnitFolderPaths = priorUnitFolderPaths;
+          await settingsComponent.editAndSave((settings) => {
+            settings.attachmentFolderPath = priorAttachmentFolderPath;
+            settings.attachmentUnitFolderPaths = priorUnitFolderPaths;
+          });
           app.vault.setConfig('alwaysUpdateLinks', priorAlwaysUpdateLinks);
 
           if (await app.vault.adapter.exists(root)) {
@@ -381,6 +371,7 @@ describe('Deleting a folder on the layout of the reporter\'s second sample vault
       input: {
         backlinkCount: EXPECTED_BACKLINK_COUNT,
         expectedModalTitle: EXPECTED_MODAL_TITLE,
+        findPluginSettingsComponent,
         handlerPluginId: HANDLER_PLUGIN_ID,
         migrationModalTitlePrefix: MIGRATION_MODAL_TITLE_PREFIX,
         pluginId: PLUGIN_ID,

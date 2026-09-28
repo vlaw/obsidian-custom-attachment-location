@@ -51,7 +51,7 @@ describe('Collect deletes the folder an attachment unit folder was carried out o
         interface UnitFolderSettings {
           attachmentFolderPath: string;
           attachmentUnitFolderPaths: string[];
-          isAttachmentUnitFolder(path: string): boolean;
+          isAttachmentUnitFolder: (path: string) => boolean;
         }
 
         /*
@@ -63,9 +63,9 @@ describe('Collect deletes the folder an attachment unit folder was carried out o
          * component's live ref, which is the path the sweep really reads.
          */
         interface HandedOverProvider {
-          getSettings(): Record<string, unknown>;
-          isPathIgnored(path: string): boolean;
-          isTreatedAsAttachment(path: string): boolean;
+          getSettings: () => Record<string, unknown>;
+          isPathIgnored: (path: string) => boolean;
+          isTreatedAsAttachment: (path: string) => boolean;
         }
 
         interface HandedOverProviderRef {
@@ -90,7 +90,7 @@ describe('Collect deletes the folder an attachment unit folder was carried out o
         }
 
         // Neither the settings nor the read-back component is exposed publicly, so both are located by
-        // Walking the plugin's component tree.
+        // walking the plugin's component tree.
         function findInPluginTree<T>(match: (record: Record<string, unknown>) => null | T): null | T {
           const block = new Set(['app', 'containerEl', 'dom', 'metadataCache', 'plugins', 'vault', 'workspace']);
           const seen = new Set<unknown>();
@@ -169,8 +169,7 @@ describe('Collect deletes the folder an attachment unit folder was carried out o
         const movedLinkedPath = `${noteFolder}/page_files/logo.png`;
 
         try {
-          // eslint-disable-next-line no-template-curly-in-string -- A plugin token, not a JS template literal.
-          settings.attachmentFolderPath = './assets/${noteFileName}';
+          settings.attachmentFolderPath = './assets/{{noteFileName}}';
           settings.attachmentUnitFolderPaths = [unitFolderPath];
           holder.apiRef = {
             value: {

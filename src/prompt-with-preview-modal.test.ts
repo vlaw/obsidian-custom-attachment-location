@@ -81,23 +81,21 @@ function createContext(overrides: StrictProxyPartial<TokenEvaluatorContext>): To
   return strictProxy<TokenEvaluatorContext>({
     app: createApp({}),
     fillTemplate: vi.fn((template: string): Promise<string> => Promise.resolve(template)),
-    // eslint-disable-next-line no-template-curly-in-string -- This is a literal token template string, not a JS template literal.
-    fullTemplate: 'before${token}after',
+    fullTemplate: 'before{{token}}after',
     getAttachmentFileContent: vi.fn((): Promise<ArrayBuffer | undefined> => Promise.resolve(undefined)),
     originalAttachmentFileExtension: 'png',
     originalAttachmentFileName: 'image',
     templatePart: TemplatePart.Other,
     tokenEndOffset: 13,
     tokenStartOffset: 6,
-    // eslint-disable-next-line no-template-curly-in-string -- This is a literal token template string, not a JS template literal.
-    tokenWithFormat: '${token}',
+    tokenWithFormat: '{{token}}',
     ...overrides
   });
 }
 
 function createEmbedRegistry(embedByExtension: EmbedByExtension): App['embedRegistry'] {
   // A null-prototype dictionary so strictProxy does not wrap it (it only wraps plain objects),
-  // Letting lookups of missing extensions return `undefined` instead of throwing.
+  // letting lookups of missing extensions return `undefined` instead of throwing.
   const dictionary = Object.assign(Object.create(null), embedByExtension);
   return castTo<App['embedRegistry']>({
     embedByExtension: dictionary
@@ -115,19 +113,11 @@ function getButtonText(button: ButtonComponent): string {
 }
 
 function getInputEl(textComponent: TextComponent | undefined): HTMLInputElement | undefined {
-  if (!textComponent) {
-    return undefined;
-  }
-
-  return TextComponentClass.fromOriginalType4__(textComponent).inputEl;
+  return textComponent ? TextComponentClass.fromOriginalType4__(textComponent).inputEl : undefined;
 }
 
 function isButtonDisabled(button: ButtonComponent | undefined): boolean {
-  if (!button) {
-    return false;
-  }
-
-  return ButtonComponentClass.fromOriginalType2__(button).disabled;
+  return button ? ButtonComponentClass.fromOriginalType2__(button).disabled : false;
 }
 
 beforeAll(async () => {
@@ -304,6 +294,8 @@ describe('promptWithPreview', () => {
     });
     await flushOnOpen();
     captured.textComponents[0]?.setValue('updated-value');
+    // `setValue` alone does not fire `onChange` in Obsidian; the user's typing raises the input event that does.
+    getInputEl(captured.textComponents[0])?.dispatchEvent(new Event('input'));
     clickButton(captured.buttons[0]);
     const result = await promise;
     expect(result).toBe('updated-value');
@@ -404,7 +396,7 @@ describe('promptWithPreview', () => {
     await promise;
   });
 
-  it('should not load an embed in the preview modal when there is no embeddable creator', async () => {
+  it('should disable the Preview button when there is no embeddable creator', async () => {
     const promise = promptWithPreview({
       context: createContext({
         app: createApp({
@@ -416,9 +408,41 @@ describe('promptWithPreview', () => {
       valueValidator: vi.fn((): Promise<null | string> => Promise.resolve(null))
     });
     await flushOnOpen();
+    expect(isButtonDisabled(captured.buttons[2])).toBe(true);
     clickButton(captured.buttons[2]);
     await flushOnOpen();
     expect(hoisted.embedComponent.load).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+  });
+
+  it('should not load an embed when the embeddable creator is unregistered after the prompt opened', async () => {
+    const embeddableCreator = vi.fn<EmbedCreator>(() => castTo<ReturnType<EmbedCreator>>(hoisted.embedComponent));
+    const embedRegistry = createEmbedRegistry({ png: embeddableCreator });
+    const createBinary = vi.fn((path: string): Promise<TFile> => Promise.resolve(strictProxy<TFile>({ name: 'temp', path })));
+    const vault = castTo<App['vault']>({
+      createBinary,
+      getConfig: vi.fn((): boolean => true)
+    });
+    const promise = promptWithPreview({
+      context: createContext({
+        app: createApp({
+          embedRegistry,
+          vault
+        }),
+        getAttachmentFileContent: (): Promise<ArrayBuffer | undefined> => Promise.resolve(new ArrayBuffer(8))
+      }),
+      defaultValue: 'default-value',
+      valueValidator: vi.fn((): Promise<null | string> => Promise.resolve(null))
+    });
+    await flushOnOpen();
+    expect(isButtonDisabled(captured.buttons[2])).toBe(false);
+    // The plugin that registered the extension unloads while the prompt is still open.
+    Reflect.deleteProperty(embedRegistry.embedByExtension, 'png');
+    clickButton(captured.buttons[2]);
+    await flushOnOpen();
+    expect(createBinary).not.toHaveBeenCalled();
+    expect(embeddableCreator).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(0);
     await promise;
   });

@@ -84,13 +84,14 @@ const EXPECTED_ROW_COUNT = 35;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
-// The overlap banner's single input. Whether it writes anything is what decides the row's fate, since the
-// Row hides itself when the library renders nothing.
+// The overlap banner's two inputs: what the library writes into the row, and whether a warning conflict
+// holds at all, which is what decides whether the row exists.
 const renderConflictWarningBannerMock = vi.fn<(containerEl: HTMLElement) => void>();
+const hasActiveWarningConflictsMock = vi.fn<() => boolean>();
 
 interface CapturedMultipleValueComponent {
   name: string;
-  setValue(value: readonly string[]): unknown;
+  setValue: (value: readonly string[]) => unknown;
 }
 
 interface CapturedToggle {
@@ -101,7 +102,7 @@ interface CapturedToggle {
 interface CapturedValueComponent {
   inputEl?: HTMLInputElement | HTMLTextAreaElement;
   name: string;
-  setValue(value: string): unknown;
+  setValue: (value: string) => unknown;
 }
 
 interface CreatedTab {
@@ -149,11 +150,7 @@ const originalSetName = SettingEx.prototype.setName;
  * @returns The resolved value.
  */
 function checkPredicate(predicate: (() => boolean) | boolean | undefined, shouldDefaultTo: boolean): boolean {
-  if (typeof predicate === 'function') {
-    return predicate();
-  }
-
-  return predicate ?? shouldDefaultTo;
+  return typeof predicate === 'function' ? predicate() : predicate ?? shouldDefaultTo;
 }
 
 async function createTab(configure?: (settings: PluginSettings) => void): Promise<CreatedTab> {
@@ -161,7 +158,7 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   const originalApp = app.asOriginalType__();
 
   // The plugin picker builds its options from the installed manifests; the strict proxy throws on an
-  // Unassigned property, so seed them on the raw target the way the plugin suite does.
+  // unassigned property, so seed them on the raw target the way the plugin suite does.
   seedOnRawTarget(originalApp, 'plugins', {
     manifests: {
       // This plugin must never offer ITSELF as something that creates attachments for it to rename.
@@ -204,7 +201,13 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   addTextSpy.mockImplementation(function capturingAddText(this: SettingEx, callback): SettingEx {
     const name = this.nameEl.textContent;
     return originalAddText.call(this, (component) => {
-      textLikeComponents.push({ inputEl: component.inputEl, name, setValue: (value) => component.setValue(value) });
+      textLikeComponents.push({
+        inputEl: component.inputEl,
+        name,
+        setValue: (value) => {
+          typeInto(component.setValue(value).inputEl);
+        }
+      });
       callback(component);
     });
   });
@@ -213,7 +216,12 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   addCodeHighlighterSpy.mockImplementation(function capturingAddCodeHighlighter(this: SettingEx, callback): SettingEx {
     const name = this.nameEl.textContent;
     return originalAddCodeHighlighter.call(this, (component: CodeHighlighterComponent) => {
-      textLikeComponents.push({ name, setValue: (value) => component.setValue(value) });
+      textLikeComponents.push({
+        name,
+        setValue: (value) => {
+          typeInto(component.setValue(value).inputEl);
+        }
+      });
       callback(component);
     });
   });
@@ -222,7 +230,12 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   addDropdownSpy.mockImplementation(function capturingAddDropdown(this: SettingEx, callback): SettingEx {
     const name = this.nameEl.textContent;
     return originalAddDropdown.call(this, (component: DropdownComponent) => {
-      textLikeComponents.push({ name, setValue: (value) => component.setValue(value) });
+      textLikeComponents.push({
+        name,
+        setValue: (value) => {
+          pickIn(component.setValue(value).selectEl);
+        }
+      });
       callback(component);
     });
   });
@@ -231,7 +244,13 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   addNumberSpy.mockImplementation(function capturingAddNumber(this: SettingEx, callback): SettingEx {
     const name = this.nameEl.textContent;
     return originalAddNumber.call(this, (component: NumberComponent) => {
-      textLikeComponents.push({ inputEl: component.inputEl, name, setValue: (value) => component.setValue(Number(value)) });
+      textLikeComponents.push({
+        inputEl: component.inputEl,
+        name,
+        setValue: (value) => {
+          typeInto(component.setValue(Number(value)).inputEl);
+        }
+      });
       callback(component);
     });
   });
@@ -240,7 +259,12 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   addMultipleTextSpy.mockImplementation(function capturingAddMultipleText(this: SettingEx, callback): SettingEx {
     const name = this.nameEl.textContent;
     return originalAddMultipleText.call(this, (component: MultipleTextComponent) => {
-      multipleTextComponents.push({ name, setValue: (value) => component.setValue(value) });
+      multipleTextComponents.push({
+        name,
+        setValue: (value) => {
+          typeInto(component.setValue(value).inputEl);
+        }
+      });
       callback(component);
     });
   });
@@ -257,7 +281,12 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
        */
       seedOnRawTarget(component, 'setPlaceholderValue', undefined);
       seedOnRawTarget(component, 'isEmpty', undefined);
-      multipleDropdownComponents.push({ name, setValue: (value) => component.setValue(value) });
+      multipleDropdownComponents.push({
+        name,
+        setValue: (value) => {
+          pickIn(component.setValue(value).selectEl);
+        }
+      });
       callback(component);
     });
   });
@@ -290,6 +319,7 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   const tab = new PluginSettingsTab({
     getPluginGateComponent: (): PluginGateComponent =>
       strictProxy<PluginGateComponent>({
+        hasActiveWarningConflicts: hasActiveWarningConflictsMock,
         renderConflictWarningBanner: renderConflictWarningBannerMock
       }),
     plugin: obsidianPlugin,
@@ -482,8 +512,9 @@ describe('PluginSettingsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // `clearAllMocks` drops the recorded calls but keeps any implementation set by an earlier test, and
-    // Whether this one writes into the container is exactly what the overlap row's tests differ on.
+    // whether this one writes into the container is exactly what the overlap row's tests differ on.
     renderConflictWarningBannerMock.mockReset();
+    hasActiveWarningConflictsMock.mockReset();
   });
 
   afterEach(() => {
@@ -506,28 +537,31 @@ describe('PluginSettingsTab', () => {
     });
 
     // The library renders nothing when no overlap holds, and an empty row is still a row — a divider and a
-    // Block of padding with nothing in it.
-    it('should hide itself when the gate renders no banner', async () => {
+    // block of padding with nothing in it.
+    it('should hide itself when no warning conflict holds', async () => {
+      hasActiveWarningConflictsMock.mockReturnValue(false);
       const { tab } = await createTab();
-      const setting = new SettingEx(tab.containerEl);
 
-      findConflictRow(tab).render(setting, castTo<SettingGroup>(null));
-
-      // `isShown()` reads `offsetParent`, which jsdom never populates, so the display style is what a test
-      // Can actually see here.
-      expect(setting.settingEl.style.display).toBe('none');
+      expect(isRowVisible(tab, '')).toBe(false);
     });
 
-    it('should stay visible once the gate has rendered a banner', async () => {
-      renderConflictWarningBannerMock.mockImplementation((containerEl) => {
-        containerEl.createDiv({ text: 'Overlap' });
-      });
+    it('should show itself while a warning conflict holds', async () => {
+      hasActiveWarningConflictsMock.mockReturnValue(true);
       const { tab } = await createTab();
-      const setting = new SettingEx(tab.containerEl);
 
-      findConflictRow(tab).render(setting, castTo<SettingGroup>(null));
+      expect(isRowVisible(tab, '')).toBe(true);
+    });
 
-      expect(setting.settingEl.style.display).toBe('');
+    // A function, not a value: the gate re-evaluates as plugins are enabled and disabled while the tab is open,
+    // and the tab re-reads a function form on every render.
+    it('should re-read the gate on every evaluation', async () => {
+      const { tab } = await createTab();
+      hasActiveWarningConflictsMock.mockReturnValue(false);
+      expect(isRowVisible(tab, '')).toBe(false);
+
+      hasActiveWarningConflictsMock.mockReturnValue(true);
+
+      expect(isRowVisible(tab, '')).toBe(true);
     });
 
     it('should stay out of the settings search', async () => {
@@ -571,7 +605,7 @@ describe('PluginSettingsTab', () => {
   it('should keep Core inline and expose every other group as a navigable sub-page', async () => {
     const { tab } = await createTab();
     // The overlap banner rides at the top as a bare ROW: Obsidian never calls `display()` once the declarative
-    // Definitions are non-empty, so there is nowhere else to put it.
+    // definitions are non-empty, so there is nowhere else to put it.
     const [conflictBanner, coreGroup, ...pages] = tab.getSettingDefinitions();
     expect(castTo<SettingDefinitionRender>(conflictBanner).name).toBe('');
 
@@ -1021,4 +1055,16 @@ function getResetButton(buttons: ButtonComponentClass[]): ButtonComponentClass {
     throw new Error('Reset button was not captured.');
   }
   return button;
+}
+
+// Obsidian fires a select's `onChange` from the element's `change` event, never from `setValue`, so a
+// test that changes a row the way the user does has to raise that event after setting the value.
+function pickIn(selectEl: HTMLSelectElement): void {
+  selectEl.dispatchEvent(new Event('change'));
+}
+
+// Obsidian fires a text-like input's `onChange` from the element's `input` event, never from `setValue`,
+// so a test that changes a row the way the user does has to raise that event after setting the value.
+function typeInto(inputEl: HTMLInputElement | HTMLTextAreaElement): void {
+  inputEl.dispatchEvent(new Event('input'));
 }

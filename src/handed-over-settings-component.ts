@@ -73,17 +73,13 @@ export class HandedOverSettingsComponent extends ComponentEx {
    */
   public isTreatedAsAttachment(path: string): boolean {
     const api = this.apiRef?.value;
-    if (api) {
-      return api.isTreatedAsAttachment(path);
-    }
-
-    return DEFAULT_HANDED_OVER_SETTINGS.treatAsAttachmentExtensions.some((extension) => path.endsWith(extension));
+    return api ? api.isTreatedAsAttachment(path) : DEFAULT_HANDED_OVER_SETTINGS.treatAsAttachmentExtensions.some((extension) => path.endsWith(extension));
   }
 
   public override onload(): void {
     // A watch rather than `whenAvailable()`: that wait blocks for ten seconds and then throws when the
-    // Plugin is simply not installed, which would stall this plugin's load for every user who declined the
-    // Suggestion. The ref costs nothing while the provider is absent and becomes live the moment it appears.
+    // plugin is simply not installed, which would stall this plugin's load for every user who declined the
+    // suggestion. The ref costs nothing while the provider is absent and becomes live the moment it appears.
     this.apiRef = watchPluginApi<AdvancedRenameAndDeleteHandlerApi>({
       apiVersionRange: ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE,
       app: this.app,

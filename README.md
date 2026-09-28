@@ -2,11 +2,11 @@
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/mnaoumov) [![GitHub release](https://img.shields.io/github/v/release/mnaoumov/obsidian-custom-attachment-location)](https://github.com/mnaoumov/obsidian-custom-attachment-location/releases) [![GitHub downloads](https://img.shields.io/github/downloads/mnaoumov/obsidian-custom-attachment-location/total)](https://github.com/mnaoumov/obsidian-custom-attachment-location/releases) [![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/mnaoumov/obsidian-custom-attachment-location)
 
-Paste a screenshot into [Obsidian](https://obsidian.md/) and it lands in one shared attachment folder under a name like `Pasted image 20250101120000`. A year later that folder holds a thousand files whose names say nothing about which note they belong to, and moving or renaming a note leaves its attachments behind. This plugin lets you decide **where** each attachment is stored and **what** it is called, from a pattern built out of tokens — `${noteFileName}`, `${date:{momentJsFormat:'YYYYMMDD'}}`, and about twenty more — and then keeps that arrangement true as notes are renamed, moved and deleted. The renaming and deleting half is handled by its companion plugin, [Advanced Rename and Delete Handler](https://obsidian.md/plugins?id=advanced-rename-and-delete-handler), which this plugin requires: it does nothing until that plugin is installed, and installs it for you in one click.
+Paste a screenshot into [Obsidian](https://obsidian.md/) and it lands in one shared attachment folder under a name like `Pasted image 20250101120000`. A year later that folder holds a thousand files whose names say nothing about which note they belong to, and moving or renaming a note leaves its attachments behind. This plugin lets you decide **where** each attachment is stored and **what** it is called, from a pattern built out of tokens — `{{noteFileName}}`, `{{date:{momentJsFormat:'YYYYMMDD'}}}`, and about twenty more — and then keeps that arrangement true as notes are renamed, moved and deleted. The renaming and deleting half is handled by its companion plugin, [Advanced Rename and Delete Handler](https://obsidian.md/plugins?id=advanced-rename-and-delete-handler), which this plugin requires: it does nothing until that plugin is installed, and installs it for you in one click.
 
 <!-- markdownlint-disable MD033 -->
 
-<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-1.png"><img src="images/screenshots/screenshot-desktop-1.png" alt="Every pasted screenshot in one heap, named after the clock" width="600"></a>
+<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-1.png"><img src="images/screenshots/screenshot-desktop-1.png" alt="Every pasted screenshot in one heap, named by the clock" width="600"></a>
 
 <details>
 <summary>More screenshots</summary>
@@ -15,12 +15,12 @@ Paste a screenshot into [Obsidian](https://obsidian.md/) and it lands in one sha
 <a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-2.png"><img src="images/screenshots/screenshot-desktop-2.png" alt="With the plugin: a folder of its own, beside the note" width="600"></a>
 <a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-3.png"><img src="images/screenshots/screenshot-desktop-3.png" alt="And named after the note it belongs to, not the clock" width="600"></a>
 <a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-4.png"><img src="images/screenshots/screenshot-desktop-4.png" alt="Rename the note and its attachments move with it" width="600"></a>
-<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-5.png"><img src="images/screenshots/screenshot-desktop-5.png" alt="The embed still resolves — nothing is left pointing nowhere" width="600"></a>
-<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-1.png"><img src="images/screenshots/screenshot-mobile-1.png" alt="Every pasted screenshot in one heap, named after the clock" width="270"></a>
+<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-desktop-5.png"><img src="images/screenshots/screenshot-desktop-5.png" alt="The embed still resolves — no broken links" width="600"></a>
+<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-1.png"><img src="images/screenshots/screenshot-mobile-1.png" alt="Every pasted screenshot in one heap, named by the clock" width="270"></a>
 <a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-2.png"><img src="images/screenshots/screenshot-mobile-2.png" alt="With the plugin: a folder of its own, beside the note" width="270"></a>
 <a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-3.png"><img src="images/screenshots/screenshot-mobile-3.png" alt="And named after the note it belongs to, not the clock" width="270"></a>
 <a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-4.png"><img src="images/screenshots/screenshot-mobile-4.png" alt="Rename the note and its attachments move with it" width="270"></a>
-<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-5.png"><img src="images/screenshots/screenshot-mobile-5.png" alt="The embed still resolves — nothing is left pointing nowhere" width="270"></a>
+<a href="https://github.com/mnaoumov/obsidian-custom-attachment-location/blob/HEAD/images/screenshots/screenshot-mobile-5.png"><img src="images/screenshots/screenshot-mobile-5.png" alt="The embed still resolves — no broken links" width="270"></a>
 </div>
 
 </details>
@@ -69,7 +69,9 @@ Moved to [06 Settings](<./demo-vault/06 Settings.md>), under `markdownUrlFormat`
 
 Everything this plugin offers another plugin is declared in one hand-written file — [api.d.ts](./api.d.ts) at the repository root. It imports from `obsidian` and nothing else, so you can copy it into your own code or reference it where it sits, with no build-time dependency on this repository.
 
-The API is published through the `obsidian-dev-utils` plugin registry under the plugin id `obsidian-custom-attachment-location`, so you get version negotiation, a handle that is revoked when this plugin unloads, and a wait that ends when it loads rather than a lookup that returns `undefined` because it ran first:
+The API is published through the `obsidian-dev-utils` plugin registry under the plugin id `obsidian-custom-attachment-location`, so you get version negotiation, a handle that is revoked when this plugin unloads, and a wait that ends when it loads rather than a lookup that returns `undefined` because it ran first. The contract version is `1.2.0` and moves independently of the plugin's own version, so pin a range against the contract, not against a release.
+
+If your plugin already uses [`obsidian-dev-utils`](https://mnaoumov.dev/obsidian-dev-utils/guides/cross-plugin-apis/), `watchPluginApi` is the whole of it:
 
 ```ts
 const apiRef = watchPluginApi<CustomAttachmentLocationApi>({
@@ -82,6 +84,8 @@ const apiRef = watchPluginApi<CustomAttachmentLocationApi>({
 const folder = await apiRef.value?.getAttachmentFolderPath({ notePath: 'Notes/Alpha.md' });
 const properPath = await apiRef.value?.getProperAttachmentPath({ attachmentPathOrFile: 'image.png', notePath: 'Notes/Alpha.md' });
 ```
+
+If your plugin does not use `obsidian-dev-utils` — and is not going to — you still need no dependency on anything. The registry, and the two events a plugin announces itself through, are a documented wire protocol reachable with the `obsidian` module alone; [Plugin API protocol](https://mnaoumov.dev/obsidian-dev-utils/guides/plugin-api-protocol/) is that route written out, and `api.d.ts` types it just as well, since nothing in that file imports the library either. Look the API up each time you use it rather than keeping it in a field: the raw object does not know when this plugin has unloaded.
 
 ### Do not read `vault.getConfig('attachmentFolderPath')`
 

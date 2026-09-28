@@ -20,6 +20,8 @@ It is deliberately careful, because it deletes your data:
 - A confirmation dialog **before** anything happens states **how many** attachments will go, then names them - the first 50, and a count of the rest, because vault-wide the list can run to thousands and a wall of paths is not something you can weigh.
 - Files go to the **trash** (recoverable), honoring your Obsidian "Deleted files" setting.
 - Notes under an ignored path are skipped, on both scopes.
+- **A file you have listed in `treatAsAttachmentExtensions` is never swept as a note**, on either scope, and the per-note command is not offered while one is the active file. `.excalidraw.md` is the default entry. A drawing is an attachment of the note that embeds it, not a note with an attachment folder of its own, and sweeping it as one would judge the folder its path happens to resolve to as if the drawing owned it. Such a drawing is still an attachment the sweep can *judge*. The cost is that the folder a drawing owns is not visited by this sweep at all, so a file left there stays until you remove it or **Find attachments no note owns** (below) reaches it.
+- **An image a drawing shows is kept, on either pass, whatever Excalidraw's compression setting.** Excalidraw writes each image a drawing shows as a plain `[[link]]` line under `## Embedded Files` in the drawing file. That line sits outside the compressed drawing data, and Obsidian indexes it even when the drawing's data section is wrapped in a `%%` comment, so the image always has the drawing as a backlink and is never judged unused while the drawing shows it.
 
 ## Try it
 
@@ -145,7 +147,7 @@ Delete `My note.md` and its `assets/My note/` folder stays behind. Nothing in th
 
 Two things to understand before turning it on.
 
-**You have to say where to look.** The plugin cannot work it out. `attachmentFolderPath` is a pattern, and a pattern only runs one way: `${prompt}` and `${random}` throw away the very value the folder name was built from, and two notes can resolve to the same folder. There is no "attachment root" to enumerate, so **Listed paths** takes the folders from you. If your attachments all live in folders called `!!files`, that is `/\/!!files\//` - a regular expression, because a plain entry is anchored at the vault root.
+**You have to say where to look.** The plugin cannot work it out. `attachmentFolderPath` is a pattern, and a pattern only runs one way: `{{prompt}}` and `{{random}}` throw away the very value the folder name was built from, and two notes can resolve to the same folder. There is no "attachment root" to enumerate, so **Listed paths** takes the folders from you. If your attachments all live in folders called `!!files`, that is `/\/!!files\//` - a regular expression, because a plain entry is anchored at the vault root.
 
 **"Unused" gets a wider meaning.** Without a note in the picture, the only remaining evidence is the link graph: a file with no backlinks is unused. Under **Entire vault** that includes a PDF you dropped in a folder and never linked, which you may be keeping on purpose. The confirmation dialog still names everything first, and a path excluded in **Advanced Rename and Delete Handler** is skipped, but this is the mode to point at a folder you trust rather than the whole vault.
 

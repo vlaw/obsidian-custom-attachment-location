@@ -18,8 +18,7 @@ import { getCanvasReferences } from 'obsidian-dev-utils/obsidian/canvas';
 import {
   isCanvasFile,
   isFile,
-  isFolder,
-  isNote
+  isFolder
 } from 'obsidian-dev-utils/obsidian/file-system';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { extractLinkFile } from 'obsidian-dev-utils/obsidian/link';
@@ -49,7 +48,7 @@ import { confirmMinimizable } from './modals/minimizable-confirm-modal.ts';
 import { ActionContext } from './token-evaluator-context.ts';
 
 // The note's attachment folder path template rarely depends on the attachment file name (the default
-// `./assets/${noteFileName}` does not), so a placeholder name is enough to resolve the folder to scan.
+// `./assets/{{noteFileName}}` does not), so a placeholder name is enough to resolve the folder to scan.
 const PLACEHOLDER_ATTACHMENT_FILE_NAME = 'unused-attachment';
 
 /**
@@ -310,18 +309,37 @@ export class UnusedAttachmentsRemover {
     const orphanCandidateFilesSet = new Set<TFile>();
 
     const collectFile = (file: TFile): void => {
-      if (isNote(file)) {
+      /*
+       * `isNoteEx`, not the plain extension-based `isNote`. A file listed in `treatAsAttachmentExtensions`
+       * — `.excalidraw.md` by default — is Markdown on disk, so `isNote` calls it a note and this sweep
+       * used to scan it as one. Two things are wrong with that, and the first is the dangerous one:
+       *
+       * - A drawing is an attachment of the note that embeds it, not a note with an attachment folder of
+       *   its own. Scanning it as one makes every file in the folder its path resolves to a candidate to
+       *   TRASH, judged as if the drawing owned them.
+       * - One walk would otherwise put the same file in BOTH sets: a note to scan by `isNote`, and an
+       *   orphan attachment to trash by `!isNoteEx`. A file cannot be its own attachment.
+       *
+       * The cost is deliberate and worth stating: an attachment folder reached only through a drawing is
+       * no longer visited by the note-driven pass. The orphan pass still reaches its files for a user who
+       * has opted into orphan scanning, and judges them on backlinks rather than on a note's say-so. That
+       * is enough for what a drawing shows: Excalidraw writes each image as a plain `[[path]]` line under
+       * `## Embedded Files`, outside the `compressed-json` block, and Obsidian indexes it even inside a `%%`
+       * comment (`delete-unused-attachments-drawing.desktop.integration.test.ts`).
+       */
+      const isNoteFile = this.pluginSettingsComponent.isNoteEx(file);
+      if (isNoteFile) {
         noteFilesSet.add(file);
       }
 
       /*
-       * The mode check comes first so a user who never opted in pays nothing — it short-circuits before
-       * `isNoteEx`, which asks the other plugin whether the extension is treated as an attachment.
+       * Asked once and reused, so the two sets cannot disagree and the answer — which reaches the other
+       * plugin to ask whether the extension is treated as an attachment — is paid for once per file.
        */
       if (
         shouldScanOrphanAttachments
+        && !isNoteFile
         && this.pluginSettingsComponent.settings.isOrphanAttachmentScanCandidate(file.path)
-        && !this.pluginSettingsComponent.isNoteEx(file)
       ) {
         orphanCandidateFilesSet.add(file);
       }
@@ -344,7 +362,7 @@ export class UnusedAttachmentsRemover {
     const noteFiles = [...noteFilesSet].sort((a, b) => a.path.localeCompare(b.path));
 
     // Compute the full set of attachments to trash BEFORE deleting anything, so the confirmation
-    // Modal lists exactly what will be removed.
+    // modal lists exactly what will be removed.
     const unusedAttachments = new Set<TFile>();
     // Keyed by path, so two notes reaching the same attachment unit folder queue it once.
     const unusedUnitFolderByPath = new Map<string, TFolder>();
@@ -459,12 +477,8 @@ export class UnusedAttachmentsRemover {
      */
     const orphanCandidates = [...orphanCandidateFilesSet]
       .filter((candidate) => {
-        if (referencedAttachmentPaths.has(candidate.path)) {
-          return false;
-        }
-
-        // Already judged by the note that owns it, whose answer is the better-informed one.
-        if (unusedAttachments.has(candidate)) {
+        // A referenced one is in use, and one already judged by the note that owns it has the better-informed answer.
+        if (referencedAttachmentPaths.has(candidate.path) || unusedAttachments.has(candidate)) {
           return false;
         }
 
@@ -803,14 +817,14 @@ export class UnusedAttachmentsRemover {
         timeoutInMilliseconds: this.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
       });
       // An attachment is unused only when no OTHER note still references it. Notes matching the
-      // Multiple-notes-check exclusion are ignored, mirroring the Collect/Move commands, so a shared
-      // Attachment is never trashed. With no scanning note, `notePath` matches no backlink and every
-      // Reference counts, which is the safe way to be wrong.
+      // multiple-notes-check exclusion are ignored, mirroring the Collect/Move commands, so a shared
+      // attachment is never trashed. With no scanning note, `notePath` matches no backlink and every
+      // reference counts, which is the safe way to be wrong.
       //
       // `excludeExtensionsFromMultipleNotesCheck` is deliberately NOT consulted here, and the inconsistency
-      // Is the point rather than an oversight. There the list means "collect it anyway"; here the same list
-      // Would mean "stop counting the notes that still reference it", and this branch TRASHES what it
-      // Judges unused - so honoring it would delete exactly the shared files the setting exists to protect.
+      // is the point rather than an oversight. There the list means "collect it anyway"; here the same list
+      // would mean "stop counting the notes that still reference it", and this branch TRASHES what it
+      // judges unused - so honoring it would delete exactly the shared files the setting exists to protect.
       const relevantBacklinks = backlinks.keys().filter((backlink) => backlink !== notePath && !this.pluginSettingsComponent.settings.isExcludedFromMultipleNotesCheck(backlink));
       if (relevantBacklinks.length === 0) {
         unusedAttachments.push(candidate);
@@ -818,7 +832,7 @@ export class UnusedAttachmentsRemover {
     };
 
     // Same rule as the note-driven pass applies to its own notice: `loop` holds its notice for a minimum
-    // Two seconds, so putting one in front of a single candidate turns an instant answer into a slow one.
+    // two seconds, so putting one in front of a single candidate turns an instant answer into a slow one.
     if (params.shouldShowProgressBar && perFileCandidates.length > 1) {
       await loop({
         abortSignal,
@@ -831,7 +845,7 @@ export class UnusedAttachmentsRemover {
         shouldShowProgressBar: true
       });
       // `loop` returns quietly when the signal trips mid-run, so the abort has to be re-raised here or a
-      // Cancelled scan would go on to show a confirmation dialog built from a partial answer.
+      // cancelled scan would go on to show a confirmation dialog built from a partial answer.
       abortSignal.throwIfAborted();
     } else {
       for (const candidate of perFileCandidates) {

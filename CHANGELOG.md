@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 14.0.0
+
+**Breaking: the token syntax moved from `${...}` to `{{...}}`.** Tokens are now written `{{noteFileName}}`, and a token with a format takes `{{token:format}}`, for example `{{date:YYYY-MM-DD}}`. The `${token}` and `${token:{...}}` forms no longer parse.
+
+Upgrading from `${...}`: your saved patterns are rewritten to `{{...}}` automatically the first time 14.0.0 loads. Your custom tokens code is JavaScript you wrote, so it is left as it is: a `ctx.fillTemplate('${noteFileName}')` in it fails with an error naming the `{{noteFileName}}` that replaces it, rather than silently producing a wrong name. The demo vault's `03 Tokens and patterns` note has the full token reference.
+
+- refactor(settings): merge stating that the legacy file-name pattern is never absent
+- docs(settings): merge spelling behavior the US way so the spellcheck gate passes
+- refactor(settings): merge dropping the loadFromFile override the obsidian-dev-utils base now covers
+- test(integration): merge naming the empty-folder cleanup race behind Failed to parse path
+- feat(settings): merge recognizing a drawing by its excalidraw-plugin property through the handler (#90)
+- test(screenshots): merge capturing the desktop frames without the editor caret
+- test(screenshots): merge pinning the clock the store captures read
+- refactor(settings): merge dropping the anchored placeholder override
+- docs(agents): merge noting the capture suites as the one writer of the handler record
+- chore(deps): merge the dependency sweep onto obsidian-integration-testing 17 and the re-shot store frames
+- refactor(settings): merge dropping the private-field onSavingRecord override on obsidian-dev-utils 107
+- refactor(styles): merge dropping the local multiple-dropdown rule on obsidian-dev-utils 107 (#86)
+- feat(external-attachments): merge renaming an image pasted into an Excalidraw drawing (#65)
+- test(coverage): merge covering the branches the obsidian-test-mocks 7 float left uncovered
+- test(delete-unused): merge pinning that the images a drawing shows are backlinks
+- refactor(tokens): merge keeping parseFormatObject file-local
+- test(integration): merge editing settings through editAndSave in every desktop suite
+- fix(tokens): merge registering the stored custom tokens when enabled after layout-ready
+- chore(deps): merge floating obsidian-test-mocks to ^7.0.0
+- docs(demo-vault): merge stating what skipping a drawing costs the delete-unused sweep
+- docs(readme): merge linking both cross-plugin API guides
+- fix: merge moving an attachment used by a single note to its proper folder
+- style(comments): merge lowercasing the wrapped-comment continuation lines
+- test(api): merge the per-note suite's editAndSave settings seam
+- refactor(settings): merge showing the overlap banner row through a visible predicate
+- feat!: merge the move to the {{token:format}} syntax
+- build(lint): merge turning on no-soft-break-in-paragraph
+- refactor: merge dropping the local command disposal the base now makes redundant
+- chore(deps): merge raising obsidian-dev-utils to 106 and obsidian-integration-testing to 16
+- test(demo-vault): merge installing CodeScript Toolkit headlessly when it is missing
+- chore: merge adopting the npm run gate branch gate
+- fix(settings): merge stopping every settings load from rewriting data.json
+- fix(deps): merge restoring the lockfile's missing resolved and integrity fields
+- fix: merge never sweeping a drawing as a note for unused attachments
+- fix: merge giving a drawing treated as an attachment its base name as link text
+
 ## 13.1.0-beta.0
 
 - Merge tag '13.0.0' into develop

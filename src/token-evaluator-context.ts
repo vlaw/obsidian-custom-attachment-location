@@ -72,7 +72,7 @@ export enum ActionContext {
 /**
  * Which template a token is being evaluated in.
  *
- * Tells a token what the value it returns will become, which is what lets `${prompt}` ask a question
+ * Tells a token what the value it returns will become, which is what lets `{{prompt}}` ask a question
  * that matches what the user is actually deciding — a file name, a folder, or neither.
  */
 export enum TemplatePart {
@@ -130,12 +130,13 @@ export interface TokenEvaluatorContext {
   /**
    * Fills a template with the current context.
    */
-  fillTemplate(template: string): Promise<string>;
+  fillTemplate: (template: string) => Promise<string>;
 
   /**
-   * The format of the token.
+   * The format of the token: `null` for none, the text itself for the scalar shorthand (`{{date:YYYY-MM-DD}}`),
+   * and the parsed JSON5 object otherwise.
    */
-  format: null | Record<string, unknown>;
+  format: null | Record<string, unknown> | string;
 
   /**
    * A full template string.
@@ -166,7 +167,7 @@ export interface TokenEvaluatorContext {
    * @returns A {@link Promise} that resolves to the content of the attachment file, or `undefined`
    * when there is no attachment file to read.
    */
-  getAttachmentFileContent(): Promise<ArrayBuffer | undefined>;
+  getAttachmentFileContent: () => Promise<ArrayBuffer | undefined>;
 
   /**
    * A name of the note file.

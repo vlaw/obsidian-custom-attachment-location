@@ -6,6 +6,8 @@ import {
   it
 } from 'vitest';
 
+import { findPluginSettingsComponent } from '../scripts/helpers/plugin-settings-component-finder.ts';
+
 /*
  * End-to-end coverage for the published per-note read (`CustomAttachmentLocationApi.getAttachmentFolderPath`).
  *
@@ -26,8 +28,7 @@ import {
  */
 
 const PLUGIN_ID = 'obsidian-custom-attachment-location';
-// eslint-disable-next-line no-template-curly-in-string -- A plugin token, not a JS template literal.
-const ATTACHMENT_FOLDER_PATH = './_/${noteFileName}';
+const ATTACHMENT_FOLDER_PATH = './_/{{noteFileName}}';
 /*
  * Under the transport's ~30s per-closure cap, not at it. The closure spends this ceiling twice — once for the
  * file-open field to be filled, once for the staged embed to be indexed — and every step is a write into a
@@ -53,6 +54,7 @@ describe('The published API answers per note, which the getConfig patch cannot',
       async callback({
         app,
         attachmentFolderPath,
+        findPluginSettingsComponent: findSettingsComponent,
         lib: { waitUntil },
         pluginId,
         waitTimeoutInMilliseconds
@@ -72,9 +74,9 @@ describe('The published API answers per note, which the getConfig patch cannot',
         }
 
         interface ApiLike {
-          collectAttachments(params: CollectAttachmentsParams): Promise<void>;
-          getAttachmentFolderPath(params: GetAttachmentFolderPathParams): Promise<null | string>;
-          getProperAttachmentPath(params: GetProperAttachmentPathParams): Promise<null | string>;
+          collectAttachments: (params: CollectAttachmentsParams) => Promise<void>;
+          getAttachmentFolderPath: (params: GetAttachmentFolderPathParams) => Promise<null | string>;
+          getProperAttachmentPath: (params: GetProperAttachmentPathParams) => Promise<null | string>;
         }
 
         interface ApiRecord {
@@ -132,46 +134,6 @@ describe('The published API answers per note, which the getConfig patch cannot',
             && typeof record['shouldRenameCollectedAttachments'] === 'boolean';
         }
 
-        const pluginRecord = app.plugins.getPlugin(pluginId) as null | Record<string, unknown>;
-
-        // The settings are not exposed publicly, so the live object the resolver reads is located by walking
-        // The plugin's component tree.
-        function findSettings(): FolderSettings | null {
-          const block = new Set(['app', 'containerEl', 'dom', 'metadataCache', 'plugins', 'vault', 'workspace']);
-          const seen = new Set<unknown>();
-          const queue: unknown[] = [pluginRecord];
-          let budget = 12_000;
-          while (queue.length > 0 && budget-- > 0) {
-            const current = queue.shift();
-            if (current === null || (typeof current !== 'object' && typeof current !== 'function') || seen.has(current)) {
-              continue;
-            }
-            seen.add(current);
-            const record = current as Record<string, unknown>;
-            if (isFolderSettings(record['settings'])) {
-              return record['settings'];
-            }
-            let values: unknown[] = [];
-            if (Array.isArray(current)) {
-              values = current;
-            } else if (current instanceof Map) {
-              values = [...current.values()];
-            } else {
-              for (const [key, value] of Object.entries(record)) {
-                if (!block.has(key)) {
-                  values.push(value);
-                }
-              }
-            }
-            for (const value of values) {
-              if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
-                queue.push(value);
-              }
-            }
-          }
-          return null;
-        }
-
         /*
          * The registry, read where it lives rather than through `watchPluginApi`: the closure runs in the
          * renderer realm with no bundle of its own, and the point of this reading is that a STRANGER can find
@@ -190,14 +152,27 @@ describe('The published API answers per note, which the getConfig patch cannot',
         }
 
         const api = record.api;
-        const settings = findSettings();
+        /*
+         * Edits go through the settings component's `editAndSave`, never onto the settings object: a reload of
+         * `data.json` replaces that object, so an in-memory edit would revert to the defaults while the file-open
+         * field computed before the reload still held the staged folder.
+         */
+        const foundSettingsComponent = findSettingsComponent(app.plugins.getPlugin(pluginId), isFolderSettings);
 
-        if (!settings) {
+        if (!foundSettingsComponent) {
           return { ...EMPTY, apiFound: true, apiVersion: record.apiVersion, contractMethodNames: Object.keys(record.contract).sort() };
         }
 
-        const priorFolderPath = settings.attachmentFolderPath;
-        const wasRenamingCollectedAttachments = settings.shouldRenameCollectedAttachments;
+        // A narrowed `const` does not stay narrowed inside a function declaration below it.
+        const settingsComponent: NonNullable<typeof foundSettingsComponent> = foundSettingsComponent;
+        const priorFolderPath = settingsComponent.settings.attachmentFolderPath;
+        const wasRenamingCollectedAttachments = settingsComponent.settings.shouldRenameCollectedAttachments;
+
+        async function editSettings(changes: Partial<FolderSettings>): Promise<void> {
+          await settingsComponent.editAndSave((settings) => {
+            Object.assign(settings, changes);
+          });
+        }
 
         async function trashIfExists(path: string): Promise<void> {
           const existing = app.vault.getAbstractFileByPath(path);
@@ -217,9 +192,11 @@ describe('The published API answers per note, which the getConfig patch cannot',
         const imageFileName = `api-img-${stamp}.png`;
 
         try {
-          settings.attachmentFolderPath = attachmentFolderPath;
-          // The staged name must survive, or the asserted proper path could not name the file it was staged as.
-          settings.shouldRenameCollectedAttachments = false;
+          await editSettings({
+            attachmentFolderPath,
+            // The staged name must survive, or the asserted proper path could not name the file it was staged as.
+            shouldRenameCollectedAttachments: false
+          });
 
           await app.vault.createBinary(imageFileName, new ArrayBuffer(4));
           const openNote = await app.vault.create(`${openNoteBaseName}.md`, `![[${imageFileName}]]\n`);
@@ -272,8 +249,10 @@ describe('The published API answers per note, which the getConfig patch cannot',
             settingsFound: true
           };
         } finally {
-          settings.attachmentFolderPath = priorFolderPath;
-          settings.shouldRenameCollectedAttachments = wasRenamingCollectedAttachments;
+          await editSettings({
+            attachmentFolderPath: priorFolderPath,
+            shouldRenameCollectedAttachments: wasRenamingCollectedAttachments
+          });
           for (const path of [`${openNoteBaseName}.md`, `${closedNoteBaseName}.md`, imageFileName, `_/${openNoteBaseName}`]) {
             await trashIfExists(path);
           }
@@ -281,6 +260,7 @@ describe('The published API answers per note, which the getConfig patch cannot',
       },
       input: {
         attachmentFolderPath: ATTACHMENT_FOLDER_PATH,
+        findPluginSettingsComponent,
         pluginId: PLUGIN_ID,
         waitTimeoutInMilliseconds: WAIT_TIMEOUT_IN_MILLISECONDS
       },
