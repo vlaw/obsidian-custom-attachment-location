@@ -159,7 +159,6 @@ import { Substitutions } from './substitutions.ts';
 interface ComponentContext {
   app: AppOriginal;
   attachmentPathManager: AttachmentPathManager;
-  editAndSaveMock: ReturnType<typeof vi.fn>;
   getActiveFileMock: ReturnType<typeof vi.fn>;
   getActiveViewOfTypeMock: ReturnType<typeof vi.fn>;
   getAttachmentFolderFullPathForPathMock: ReturnType<typeof vi.fn>;
@@ -171,8 +170,6 @@ interface ComponentContext {
   settings: PluginSettings;
   whenLoadedFromFileMock: ReturnType<typeof vi.fn>;
 }
-
-const PLUGIN_VERSION = '10.0.0';
 
 let context: ComponentContext;
 
@@ -191,19 +188,13 @@ describe('CustomAttachmentLocationComponent', () => {
     const settings = strictProxy<PluginSettings>({
       // eslint-disable-next-line unicorn/name-replacements -- `customTokensStr` is a persisted `data.json` settings key; renaming it would silently drop the user's custom tokens.
       customTokensStr: 'custom-tokens',
-      shouldFollowObsidianAttachmentLocation: false,
-      version: ''
+      shouldFollowObsidianAttachmentLocation: false
     });
 
-    const editAndSaveMock = vi.fn((editor: (settings: PluginSettings) => void): Promise<void> => {
-      editor(settings);
-      return noopAsync();
-    });
     const loadFromFileMock = vi.fn((): Promise<void> => noopAsync());
     const whenLoadedFromFileMock = vi.fn((): Promise<void> => noopAsync());
 
     const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-      editAndSave: editAndSaveMock,
       loadFromFile: loadFromFileMock,
       settings,
       whenLoadedFromFile: whenLoadedFromFileMock
@@ -229,7 +220,6 @@ describe('CustomAttachmentLocationComponent', () => {
     context = {
       app,
       attachmentPathManager,
-      editAndSaveMock,
       getActiveFileMock,
       getActiveViewOfTypeMock,
       getAttachmentFolderFullPathForPathMock,
@@ -549,32 +539,6 @@ describe('CustomAttachmentLocationComponent', () => {
       expect(clipboardChildCount).toBe(1);
     });
   });
-
-  describe('showReleaseNotes', () => {
-    it('should persist the current version when there is no stored version', async () => {
-      const component = createComponent();
-      context.settings.version = '';
-      await loadAndReachLayoutReady(component);
-      expect(context.editAndSaveMock).toHaveBeenCalled();
-      expect(context.settings.version).toBe(PLUGIN_VERSION);
-    });
-
-    it('should persist the current version and show release notes for newer versions', async () => {
-      const component = createComponent();
-      context.settings.version = '9.0.0';
-      await loadAndReachLayoutReady(component);
-      expect(context.editAndSaveMock).toHaveBeenCalled();
-      expect(context.settings.version).toBe(PLUGIN_VERSION);
-    });
-
-    it('should show a version-mismatch warning and not persist when the stored version is newer', async () => {
-      const component = createComponent();
-      context.settings.version = '99.0.0';
-      await loadAndReachLayoutReady(component);
-      expect(context.editAndSaveMock).not.toHaveBeenCalled();
-      expect(context.settings.version).toBe('99.0.0');
-    });
-  });
 });
 
 function capturedChildTypes(): string[] {
@@ -599,10 +563,8 @@ function createComponent(): CustomAttachmentLocationComponent {
     handedOverSettingsComponent: context.handedOverSettingsComponent,
     imageSizeMap: strictProxy<ImageSizeMap>({}),
     markdownUrlMap: strictProxy<MarkdownUrlMap>({}),
-    pluginDirectory: 'plugins/custom-attachment-location',
     pluginId: 'custom-attachment-location',
     pluginSettingsComponent: context.pluginSettingsComponent,
-    pluginVersion: PLUGIN_VERSION,
     tokenValidator: strictProxy<TokenValidator>({})
   });
   loadedComponents.push(component);
