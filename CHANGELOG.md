@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 14.0.1
+
+- revert: leave no special case for a note's auto-export (#92)
+- fix(external-attachments): merge leaving a note's auto-export where it is written (#92)
+- test(external-attachments): merge pinning that an Excalidraw paste is renamed only once Excalidraw is listed
+- docs(external-attachments): merge saying an image pasted into a drawing is Excalidraw's write
+- test(screenshots): merge setting the desktop capture theme with applyObsidianTheme
+- test(android): merge verifying the overlap stub writes
+- fix(release-notes): merge naming the plugin in the release notes popup
+- chore(test): merge dropping the perf transport raise obsidian-dev-utils now provides
+
 ## 14.0.0
 
 **Breaking: the token syntax moved from `${...}` to `{{...}}`.** Tokens are now written `{{noteFileName}}`, and a token with a format takes `{{token:format}}`, for example `{{date:YYYY-MM-DD}}`. The `${token}` and `${token:{...}}` forms no longer parse.
