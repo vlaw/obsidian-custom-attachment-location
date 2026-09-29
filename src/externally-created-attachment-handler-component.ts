@@ -154,7 +154,6 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
     if (
       selfWriteClaim === SelfWriteClaim.Plugin
       || this.pluginSettingsComponent.isNoteEx(attachmentFile)
-      || isExportOfSiblingNote(attachmentFile)
       /*
        * Only files created just now. A vault opening, a sync catching up or a folder import all replay
        * `create` for files that already existed, and none of those are an attachment the user is adding
@@ -381,30 +380,6 @@ export class ExternallyCreatedAttachmentHandlerComponent extends Component {
       await setTimeoutAsync(NOTE_REFERENCE_POLL_INTERVAL_IN_MILLISECONDS);
     }
   }
-}
-
-/**
- * Tells whether the file is a note's EXPORT: written beside a note and named after it.
- *
- * Excalidraw's auto-export writes `<drawing>.excalidraw.svg` and `.png` (or `.dark.svg`, `.light.png` and so on)
- * next to `<drawing>.excalidraw.md` on every save, and a note that embeds the drawing as an image links to that
- * export. So it passes every other test here (issue #92). But its path is derived from the note's, so moving it
- * never sticks: the next save writes a fresh copy at the derived path, which is moved again, and a `{{prompt}}`
- * template asks for a name on every save.
- *
- * The rule is about the NAME, not about Excalidraw. A file is a derived copy of any note, drawing or canvas that
- * stands in the same folder and whose base name, followed by a dot, starts its name.
- *
- * @param file - The file another plugin created.
- * @returns Whether a sibling note gives the file its name.
- */
-function isExportOfSiblingNote(file: TFile): boolean {
-  return file.parent?.children.some((sibling) =>
-    sibling !== file
-    && sibling instanceof TFile
-    && isNote(sibling)
-    && file.name.startsWith(`${sibling.basename}.`)
-  ) ?? false;
 }
 
 /**

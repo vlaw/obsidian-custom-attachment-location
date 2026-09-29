@@ -638,43 +638,6 @@ describe('ExternallyCreatedAttachmentHandlerComponent', () => {
     expect(getApp().vault.getFileByPath('Lingua Study/Transcripts/abc.json')).not.toBeNull();
   });
 
-  it('should leave a drawing\'s auto-export where the drawing\'s plugin wrote it, though a note embeds it (issue #92)', async () => {
-    /*
-     * Excalidraw rewrites `<drawing>.excalidraw.svg` beside the drawing on every save, so a moved export is
-     * replaced by a fresh one at the same path on the next save, which would be moved again.
-     */
-    await setUp();
-    await getApp().vault.create('notes/sketch.excalidraw.md', '');
-
-    await createForeignAttachment('notes/sketch.excalidraw.svg');
-    await createForeignAttachment('notes/sketch.excalidraw.dark.png');
-
-    expect(renameFileSpy).not.toHaveBeenCalled();
-  });
-
-  it('should still rename a file named after a note when it is not beside that note, or not followed by a dot', async () => {
-    await setUp();
-    await getApp().vault.create('notes/sketch.excalidraw.md', '');
-
-    await createForeignAttachment('wherever/sketch.excalidraw.svg');
-    await createForeignAttachment('notes/sketch.excalidraw-screenshot.png');
-
-    expect(renameFileSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it('should treat a file with no parent folder as no note\'s export', async () => {
-    // Obsidian types a file's parent as nullable: a file already detached from the tree has none.
-    await getApp().vault.createFolder('wherever');
-    const file = await getApp().vault.createBinary(FOREIGN_ATTACHMENT_PATH, new ArrayBuffer(4));
-    await setUp();
-    getApp().metadataCache.resolvedLinks[NOTE_PATH] = { [FOREIGN_ATTACHMENT_PATH]: 1 };
-    file.parent = null;
-
-    await fireCreate(file);
-
-    expect(renameFileSpy).toHaveBeenCalledOnce();
-  });
-
   it('should wait for the creating plugin to insert its embed after the write', async () => {
     vi.useFakeTimers();
     try {
