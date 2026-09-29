@@ -53,6 +53,11 @@ export interface DownloadReleasedPluginParams {
  */
 export interface InstallReleasedPluginParams extends DownloadReleasedPluginParams {
   /**
+   * The plugin's `data.json`, written beside it when given. The plugin merges it over its own defaults when it loads.
+   */
+  readonly data?: Record<string, unknown>;
+
+  /**
    * The file-system path of the vault to install the plugin into.
    */
   readonly vaultPath: string;
@@ -114,6 +119,9 @@ export async function installReleasedPlugin(params: InstallReleasedPluginParams)
   await mkdir(pluginFolderPath, { recursive: true });
   await writeFile(join(pluginFolderPath, 'main.js'), files.mainJs, 'utf-8');
   await writeFile(join(pluginFolderPath, 'manifest.json'), files.manifestJson, 'utf-8');
+  if (params.data) {
+    await writeFile(join(pluginFolderPath, 'data.json'), JSON.stringify(params.data), 'utf-8');
+  }
 }
 
 /**
