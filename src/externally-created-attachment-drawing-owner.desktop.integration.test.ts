@@ -104,7 +104,11 @@ describe('An image pasted into an Excalidraw drawing (issue #65)', () => {
   it('gets the generated name, and the drawing keeps showing it through the rename and a later save', async () => {
     const vaultPath = getTemporaryVault().path;
     // Almost 5 MB of `main.js`, so it is written from Node rather than handed to the closure.
-    await installReleasedPlugin({ pluginId: EXCALIDRAW_PLUGIN_ID, repo: EXCALIDRAW_REPO, vaultPath, version: EXCALIDRAW_VERSION });
+    /*
+     * Release notes off: Excalidraw opens its Welcome dialog on every load that finds no recorded release, and the
+     * second Excalidraw suite in one Obsidian instance then times out waiting for its drawing to open.
+     */
+    await installReleasedPlugin({ data: { showReleaseNotes: false }, pluginId: EXCALIDRAW_PLUGIN_ID, repo: EXCALIDRAW_REPO, vaultPath, version: EXCALIDRAW_VERSION });
 
     const result = await evalInObsidian({
       async callback({ app, excalidrawPluginId, findPluginSettingsComponent: findSettingsComponent, pngDataUrl }): Promise<ProbeResult> {
