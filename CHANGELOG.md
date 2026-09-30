@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 14.0.2
+
+- chore: merge updating libs onto obsidian-dev-utils 107.3.1
+
 ## 14.0.1
 
 - revert: leave no special case for a note's auto-export (#92)
