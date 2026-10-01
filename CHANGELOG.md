@@ -11,6 +11,10 @@
 - fix(release-notes): merge naming the plugin in the release notes popup
 - chore(test): merge dropping the perf transport raise obsidian-dev-utils now provides
 
+## 14.0.1-beta.0
+
+- **deps**: add `ts-md5@^1.3.1`
+
 ## 14.0.0
 
 **Breaking: the token syntax moved from `${...}` to `{{...}}`.** Tokens are now written `{{noteFileName}}`, and a token with a format takes `{{token:format}}`, for example `{{date:YYYY-MM-DD}}`. The `${token}` and `${token:{...}}` forms no longer parse.
