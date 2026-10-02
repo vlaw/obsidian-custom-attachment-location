@@ -50,3 +50,21 @@ registerCustomToken('size', async (ctx) => {
   return String(content?.byteLength ?? 0);
 });
 ```
+
+## Hashing the attachment's bytes
+
+For content-addressed file names that stay stable across renames, the `Md5` class from `ts-md5` is available as the second argument to your wrapper function, so a hash-token like `{{file_md5}}` is one `registerCustomToken` call away. Pass `{ length: N }` to truncate the digest; pass nothing for the full 32 characters.
+
+```javascript
+registerCustomToken('file_md5', async (ctx) => {
+const content = await ctx.getAttachmentFileContent();
+if (content === undefined) {
+return '';
+}
+const hash = new Md5()
+.appendByteArray(new Uint8Array(content))
+.end();
+const length = ctx.format?.length ?? 32;
+return hash.slice(0, length);
+});
+```

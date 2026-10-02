@@ -1,7 +1,9 @@
+import type { Md5 as Md5Class } from 'ts-md5';
 import type { Promisable } from 'type-fest';
 
 import { printError } from 'obsidian-dev-utils/error';
 import { createFunction } from 'obsidian-dev-utils/function';
+import { Md5 } from 'ts-md5';
 import { z } from 'zod';
 
 import type { TokenEvaluatorContext } from '../token-evaluator-context.ts';
@@ -14,7 +16,7 @@ type TokenEvaluator = (context: TokenEvaluatorContext) => Promisable<string>;
 const formatSchema = z.union([z.looseObject({}), z.string()]);
 type Format = z.infer<typeof formatSchema>;
 type RegisterCustomTokenFunction = (token: string, evaluator: TokenEvaluator) => void;
-type RegisterCustomTokensWrapperFunction = (registerCustomToken: RegisterCustomTokenFunction) => void;
+type RegisterCustomTokensWrapperFunction = (registerCustomToken: RegisterCustomTokenFunction, Md5: typeof Md5Class) => void;
 
 export class CustomToken extends TokenBase<Format> {
   public constructor(name: string, private readonly evaluator: TokenEvaluator) {
@@ -25,11 +27,11 @@ export class CustomToken extends TokenBase<Format> {
     const customTokens: CustomToken[] = [];
     try {
       const registerCustomTokensWrapperFunction = createFunction<RegisterCustomTokensWrapperFunction>({
-        argumentNames: ['registerCustomToken'],
+        argumentNames: ['registerCustomToken', 'Md5'],
         functionBody: customTokensString
       });
 
-      registerCustomTokensWrapperFunction(registerCustomToken);
+      registerCustomTokensWrapperFunction(registerCustomToken, Md5);
       return customTokens;
     } catch (error) {
       printError(new Error('Error registering custom tokens', { cause: error }));

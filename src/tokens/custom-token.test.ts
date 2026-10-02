@@ -73,6 +73,43 @@ describe('CustomToken.parse', () => {
     expect(printError).not.toHaveBeenCalled();
   });
 
+  it('should expose Md5 so user-level tokens can hash the attachment bytes', async () => {
+    const tokens = CustomToken.parse(`
+      registerCustomToken('file_md5', async (ctx) => {
+        const content = await ctx.getAttachmentFileContent();
+        if (content === undefined) return '';
+        const hash = new Md5()
+          .appendByteArray(new Uint8Array(content))
+          .end();
+        return hash.slice(0, ctx.format?.length ?? 32);
+      });
+    `);
+
+    expect(tokens).not.toBeNull();
+    expect(tokens).toHaveLength(1);
+    const [fileMd5Token] = tokens ?? [];
+    expect(fileMd5Token?.name).toBe('file_md5');
+
+    const context = strictProxy<TokenEvaluatorContext>({
+      format: null,
+      getAttachmentFileContent: () => Promise.resolve(new TextEncoder().encode('hello').buffer)
+    });
+    expect(await fileMd5Token?.evaluate(context)).toBe('5d41402abc4b2a76b9719d911017c592');
+
+    const shortContext = strictProxy<TokenEvaluatorContext>({
+      format: { length: 8 },
+      getAttachmentFileContent: () => Promise.resolve(new TextEncoder().encode('hello').buffer)
+    });
+    expect(await fileMd5Token?.evaluate(shortContext)).toBe('5d41402a');
+
+    const emptyContext = strictProxy<TokenEvaluatorContext>({
+      format: null,
+      getAttachmentFileContent: () => Promise.resolve(undefined)
+    });
+    expect(await fileMd5Token?.evaluate(emptyContext)).toBe('');
+    expect(printError).not.toHaveBeenCalled();
+  });
+
   it('should return an empty array when no tokens are registered', () => {
     const tokens = CustomToken.parse('');
     expect(tokens).toEqual([]);

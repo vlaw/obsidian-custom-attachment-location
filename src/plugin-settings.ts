@@ -14,6 +14,18 @@ registerCustomToken('bar', async (ctx) => {
   const formatValue = ctx.format?.formatKey ?? 'defaultFormatValue';
   const filledTemplate = await ctx.fillTemplate('qux {{quux}} corge {{grault:{garply:\'waldo\'}}} fred');
   return ctx.noteFileName + ctx.app.appId + formatValue + ctx.obsidian.apiVersion + filledTemplate;
+});
+
+registerCustomToken('file_md5', async (ctx) => {
+  const content = await ctx.getAttachmentFileContent();
+  if (content === undefined) {
+    return '';
+  }
+  const hash = new Md5()
+    .appendByteArray(new Uint8Array(content))
+    .end();
+  const length = ctx.format?.length ?? 32;
+  return hash.slice(0, length);
 });`;
 
 export enum AttachmentRenameMode {
