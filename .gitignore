@@ -30,3 +30,7 @@ dist
 coverage
 
 .cache
+
+# Agent tooling
+.agents/
+.pi/
