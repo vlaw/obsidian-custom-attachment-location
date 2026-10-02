@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 14.1.0-beta.1
+
+- feat(custom-tokens): expose Md5 to user-level tokens
+
 ## 14.1.0-beta.0
 
 - chore(deps): add ts-md5 dependency
