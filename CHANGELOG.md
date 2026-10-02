@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 14.1.0-beta.0
+
+- chore(deps): add ts-md5 dependency
+- chore: ignore .agents and .pi directories
+
 ## 14.0.2
 
 - chore: merge updating libs onto obsidian-dev-utils 107.3.1
